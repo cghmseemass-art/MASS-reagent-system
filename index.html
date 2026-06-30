@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+/* 💡 index.html */
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>試劑庫存管理系統</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="print.css">
+	<style>
+	        body { font-family: 'Microsoft JhengHei', 'Segoe UI', sans-serif; }
+	        .low-stock td { 
+	            background-color: #FFC7CE !important; 
+	            color: #9C0006 !important; 
+	        }
+	        .normal-stock td { 
+	            background-color: #FFFFFF; 
+	        }
+	    </style>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+
+    <header class="bg-[#34495e] text-white p-4 shadow-md flex justify-between items-center no-print">
+        <h1 class="text-2xl font-bold tracking-wide">試劑庫存管理系統</h1>
+        <div id="userInfo" class="text-sm bg-[#e2e8f0] text-slate-700 p-2 rounded-md font-bold shadow-inner">
+            訪客模式 (唯讀) - 點擊功能鈕掃描識別證
+        </div>
+    </header>
+
+    <main class="p-6 max-w-7xl mx-auto space-y-6 flex-1 w-full no-print">
+        
+        <div id="actionButtons" class="bg-white p-4 rounded-lg shadow-sm flex flex-wrap gap-4 items-center">
+            <button id="btn_Tx" class="bg-blue-600 text-white px-5 py-2.5 rounded shadow hover:bg-blue-700 font-semibold transition" onclick="openModal('Tx')">試劑出入庫作業</button>
+            <button id="btn_RgStandard" class="bg-emerald-600 text-white px-5 py-2.5 rounded shadow hover:bg-emerald-700 font-semibold transition" onclick="openModal('RgStandard')">試劑標準檔維護</button>
+            <button id="btn_UserSD" class="bg-indigo-600 text-white px-5 py-2.5 rounded shadow hover:bg-indigo-700 font-semibold transition" onclick="openModal('UserSD')">人員帳號管理</button>
+            <button id="btn_Report" class="bg-purple-600 text-white px-5 py-2.5 rounded shadow hover:bg-purple-700 font-semibold transition" onclick="openModal('Report')">📊 異動紀錄明細報表</button>
+            <button id="btn_StockSummary" class="bg-amber-600 text-white px-5 py-2.5 rounded shadow hover:bg-amber-700 font-semibold transition" onclick="fetchStockData()">更新儀表板</button>
+            <button id="btn_Logout" class="hidden bg-rose-600 text-white px-5 py-2.5 rounded shadow hover:bg-rose-700 font-semibold transition ml-auto" onclick="logout(false)">登出系統</button>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="bg-[#34495e] text-white p-6 rounded-lg shadow-md text-center">
+                <div id="kpi_total" class="text-4xl font-extrabold">0</div>
+                <div class="text-sm mt-2 opacity-90 font-medium tracking-wider">試劑品項總數</div>
+            </div>
+            <div class="bg-[#27ae60] text-white p-6 rounded-lg shadow-md text-center">
+                <div id="kpi_normal" class="text-4xl font-extrabold">0</div>
+                <div class="text-sm mt-2 opacity-90 font-medium tracking-wider">常態庫存品項</div>
+            </div>
+            <div class="bg-[#c0392b] text-white p-6 rounded-lg shadow-md text-center">
+                <div id="kpi_low" class="text-4xl font-extrabold">0</div>
+                <div class="text-sm mt-2 opacity-90 font-medium tracking-wider">低庫存預警品項</div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="lg:col-span-2 bg-white p-5 rounded-lg shadow-md flex flex-col max-h-[550px]">
+                <h3 class="text-lg font-bold mb-3 text-[#34495e] border-b pb-2 flex items-center">📊 全庫存品項明細</h3>
+                <div class="overflow-y-auto flex-1 border rounded">
+                    <table class="w-full text-left border-collapse text-sm">
+                        <thead>
+                            <tr class="bg-[#34495e] text-white sticky top-0 z-10">
+                                <th class="p-3">試劑名稱</th>
+                                <th class="p-3 text-center">總庫存量</th>
+                                <th class="p-3 text-center">警示存量</th>
+                                <th class="p-3 text-center">單位</th>
+                                <th class="p-3 text-center">庫存狀態</th>
+                            </tr>
+                        </thead>
+                        <tbody id="stockTableBody">
+                            <tr><td colspan="5" class="p-4 text-center text-slate-400">庫存資料即時載入中...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="bg-white p-5 rounded-lg shadow-md flex flex-col max-h-[550px]">
+                <h3 class="text-lg font-bold mb-3 text-[#c0392b] border-b pb-2 flex items-center">⚠️ 低庫存預警面板</h3>
+                <div class="overflow-y-auto flex-1 border rounded">
+                    <table class="w-full text-left border-collapse text-sm">
+                        <thead>
+                            <tr class="bg-[#c0392b] text-white sticky top-0 z-10">
+                                <th class="p-3">預警品項</th>
+                                <th class="p-3 text-center">現量</th>
+                                <th class="p-3 text-center">安全存量</th>
+                                <th class="p-3 text-center">單位</th>
+                            </tr>
+                        </thead>
+                        <tbody id="warnTableBody">
+                            <tr><td colspan="4" class="p-4 text-center text-slate-400">無低庫存品項</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-lg shadow-md space-y-4">
+            <h3 class="text-lg font-bold text-slate-700 border-b pb-2 flex items-center">🖨️ 條碼標籤出圖與列印</h3>
+            
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                    <label class="block text-sm font-bold text-slate-600">印表機配置選單</label>
+                    <select id="printerProfile" onchange="applyPrinterProfile()" class="mt-1 block w-full rounded-md border-slate-300 bg-slate-50 border p-2.5 outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="default">預設本機設定 (無微調)</option>
+                        <option value="tsc_lab_a">TSC TTP-247</option>
+                        <option value="godex_blood">GoDEX G500</option>
+                        <option value="zebra_bch">Zebra ZD421</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-slate-600">紙張尺寸規格</label>
+                    <select id="pageSize" class="mt-1 block w-full rounded-md border-slate-300 bg-slate-50 border p-2.5 outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="50x30">50mm × 30mm (標準標籤)</option>
+                        <option value="40x30">40mm × 30mm (微縮小標籤)</option>
+                        <option value="30x20">30mm × 20mm (極小標籤)</option>
+                    </select>
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-bold text-slate-600">列印編碼內容 [CATNO|LOTNO]</label>
+                    <input type="text" id="barcodeText" class="mt-1 block w-full rounded-md border-slate-300 bg-slate-50 border p-2.5 font-mono text-lg outline-none focus:ring-2 focus:ring-blue-500" placeholder="例如: CATNO_001|LOT_2026A">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end bg-slate-50 p-4 rounded-lg border border-dashed">
+                <div>
+                    <label class="block text-xs font-bold text-slate-600">X 軸左右微調 (正數向右，負數向左)</label>
+                    <div class="flex items-center mt-1">
+                        <input type="number" id="offsetX" step="0.1" value="0.0" class="block w-full rounded-l-md border-slate-300 bg-white border p-2 text-center font-mono font-bold outline-none">
+                        <span class="bg-slate-200 border border-l-0 border-slate-300 px-3 py-2 rounded-r-md text-xs font-bold text-slate-500">mm</span>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-600">Y 軸上下微調 (正數向下，負數向上)</label>
+                    <div class="flex items-center mt-1">
+                        <input type="number" id="offsetY" step="0.1" value="0.0" class="block w-full rounded-l-md border-slate-300 bg-white border p-2 text-center font-mono font-bold outline-none">
+                        <span class="bg-slate-200 border border-l-0 border-slate-300 px-3 py-2 rounded-r-md text-xs font-bold text-slate-500">mm</span>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-slate-600">排版規格格式</label>
+                    <select id="layoutType" class="mt-1 block w-full rounded-md border-slate-300 bg-white border p-2 outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="一大">一大 (單一條碼區塊)</option>
+                        <option value="左1右2">左1右2 (複合大/小標籤)</option>
+                        <option value="左1右3">左1右3 (複合大/三小標籤)</option>
+                    </select>
+                </div>
+                <div class="flex flex-wrap gap-2 sm:flex-nowrap w-full">
+                    <button onclick="openModal('SelectQR')" class="bg-slate-700 text-white px-2 py-2.5 rounded shadow hover:bg-slate-800 transition font-bold text-xs flex-1">🔍 檢索主檔</button>
+                    <button onclick="generateLabelPreview()" class="bg-amber-600 text-white px-2 py-2.5 rounded shadow hover:bg-amber-700 transition font-bold text-xs flex-1">👁️ 僅看預覽</button>
+                    <button onclick="triggerLabelPrint()" class="bg-blue-600 text-white px-2 py-2.5 rounded shadow hover:bg-blue-700 transition font-bold text-xs flex-1">🖨️ 執行列印</button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div id="modal_Login" class="fixed inset-0 bg-slate-900 bg-opacity-85 flex items-center justify-center z-50 hidden p-4">
+        <div class="bg-white p-5 sm:p-8 rounded-xl shadow-2xl max-w-md w-full text-center space-y-4 border border-slate-200">
+            <div class="flex justify-between items-center border-b pb-2">
+                <h2 class="text-xl font-black text-slate-700 tracking-wider">系統認證 - 請掃描人員條碼</h2>
+                <button onclick="closeModal('Login')" class="text-slate-400 hover:text-slate-600 text-2xl font-light">&times;</button>
+            </div>
+            <div class="no-print">
+                <div id="login-scanner-view" class="relative w-full rounded-lg overflow-hidden border border-slate-300 bg-black mx-auto" style="display:none; margin-bottom: 8px;"></div>
+                <button type="button" onclick="toggleMobileScanner('txtUserBarcode', 'login-scanner-view')" class="w-full bg-indigo-600 text-white p-2.5 rounded shadow hover:bg-indigo-700 transition font-bold text-xs">
+                    📷 開啟/關閉 手機鏡頭掃描識別證
+                </button>
+            </div>
+            <input type="password" id="txtUserBarcode" class="w-full p-4 border-2 border-slate-300 rounded-lg text-center text-xl font-mono tracking-widest bg-slate-50 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition" placeholder="[ 人員條碼掃描區 ]">
+            <button type="button" onclick="handleLoginScan()" class="w-full bg-blue-600 text-white p-3.5 rounded-lg font-bold text-base shadow hover:bg-blue-700 transition no-print">
+                🔓 驗證身分並登入
+            </button>
+            <div id="loginErrMsg" class="text-rose-600 text-sm font-bold bg-rose-50 p-2 rounded border border-rose-200 hidden"></div>
+        </div>
+    </div>
+
+    <div id="modal_SelectQR" class="fixed inset-0 bg-slate-900 bg-opacity-60 flex items-center justify-center z-40 hidden">
+        <div class="bg-white p-6 rounded-xl shadow-2xl max-w-5xl w-full space-y-4">
+            <div class="flex justify-between items-center border-b pb-3">
+                <h2 class="text-xl font-bold text-slate-700 flex items-center">🔍 選擇試劑產生 QR Code 條碼</h2>
+                <button onclick="closeModal('SelectQR')" class="text-slate-400 hover:text-slate-600 text-3xl font-light">&times;</button>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="space-y-2">
+                    <label class="block text-xs font-bold text-slate-600 uppercase">1. 試劑品名篩選</label>
+                    <input type="text" id="cmbSearchName" class="w-full p-2 border rounded-md text-sm" placeholder="輸入關鍵字比對...">
+                    <select id="lstReagentName" size="12" class="w-full border rounded-md p-1 h-64 text-sm focus:ring-2 focus:ring-blue-400 outline-none"></select>
+                </div>
+                <div class="space-y-2">
+                    <label class="block text-xs font-bold text-slate-600 uppercase">2. 廠牌目錄號 (CATNO)</label>
+                    <select id="lstCATNO" size="12" class="w-full border rounded-md p-1 h-72 text-sm focus:ring-2 focus:ring-blue-400 outline-none"></select>
+                </div>
+                <div class="space-y-2">
+                    <label class="block text-xs font-bold text-slate-600 uppercase">3. 試劑生產批號 (LOTNO)</label>
+                    <select id="lstLOTNO" size="12" class="w-full border rounded-md p-1 h-72 text-sm focus:ring-2 focus:ring-blue-400 outline-none"></select>
+                </div>
+                <div class="bg-slate-50 p-4 rounded-lg border flex flex-col justify-between">
+                    <div class="space-y-2">
+                        <h4 class="font-bold text-slate-700 text-sm border-b pb-1">📋 選擇結果帶回</h4>
+                        <p class="text-xs text-slate-500 leading-relaxed">可在此區塊點選完成確認，或在左側批號清單上直接【雙擊滑鼠左鍵】快速帶回。</p>
+                    </div>
+                    <button onclick="putBarcodeToPrintLabel()" class="w-full bg-blue-600 text-white p-3 rounded-md hover:bg-blue-700 font-bold shadow text-sm transition">確認帶入主介面</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal_Tx" class="fixed inset-0 bg-slate-900 bg-opacity-60 flex items-center justify-center z-40 hidden p-4">
+        <div class="bg-white p-6 rounded-xl shadow-2xl max-w-md w-full space-y-4">
+            <div class="flex justify-between items-center border-b pb-3">
+                <h2 class="text-xl font-bold text-slate-700 flex items-center">🔄 試劑出入庫與異動簽核</h2>
+                <button onclick="closeModal('Tx')" class="text-slate-400 hover:text-slate-600 text-3xl font-light">&times;</button>
+            </div>
+            <div class="no-print">
+                <div id="tx-scanner-view" class="relative w-full rounded-lg overflow-hidden border border-slate-300 bg-black mx-auto" style="display:none; margin-bottom: 8px;"></div>
+                <button type="button" onclick="toggleMobileScanner('txtReagentBarcode', 'tx-scanner-view')" class="w-full bg-indigo-600 text-white p-2.5 rounded-md font-bold text-sm shadow hover:bg-indigo-700 transition">
+                    📷 開啟/關閉 手機鏡頭掃描試劑
+                </button>
+            </div>
+            <div class="flex justify-around bg-slate-100 p-2.5 rounded-lg font-bold text-sm text-slate-700">
+                <label class="flex items-center space-x-2 cursor-pointer p-1.5 rounded hover:bg-white transition flex-1 justify-center">
+                    <input type="radio" name="txMode" value="OUT" checked class="w-4 h-4 text-blue-600"> <span class="text-blue-700">出庫作業</span>
+                </label>
+                <label class="flex items-center space-x-2 cursor-pointer p-1.5 rounded hover:bg-white transition flex-1 justify-center">
+                    <input type="radio" name="txMode" value="IN" class="w-4 h-4 text-emerald-600"> <span class="text-emerald-700">入庫作業</span>
+                </label>
+                <label id="lblOptAdjust" class="hidden flex items-center space-x-2 cursor-pointer p-1.5 rounded hover:bg-white transition flex-1 justify-center">
+                    <input type="radio" name="txMode" value="ADJUST" class="w-4 h-4 text-amber-600"> <span class="text-amber-700">庫存校正</span>
+                </label>
+            </div>
+            <div class="space-y-2">
+                <label class="block text-sm font-bold text-slate-600">請掃描試劑編碼標籤 (格式: CATNO|LOTNO)</label>
+                <input type="text" id="txtReagentBarcode" class="w-full p-4 border-2 border-slate-300 rounded-lg text-center text-lg font-mono tracking-wider outline-none bg-slate-50 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition" placeholder="[ 條碼槍讀取區 ]">
+            </div>
+        </div>
+    </div>
+
+    <div id="modal_RgStandard" class="fixed inset-0 bg-slate-900 bg-opacity-60 flex items-center justify-center z-40 hidden">
+        <div class="bg-white p-6 rounded-xl shadow-2xl max-w-6xl w-full flex flex-col max-h-[90vh]">
+            <div class="flex justify-between items-center border-b pb-3 mb-4">
+                <h2 class="text-xl font-bold text-slate-700">🧪 試劑主檔規格基本維護模組</h2>
+                <button onclick="closeModal('RgStandard')" class="text-slate-400 hover:text-slate-600 text-3xl font-light">&times;</button>
+            </div>
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 overflow-y-auto pr-1">
+                <div class="lg:col-span-1 space-y-4 border-r pr-4 border-slate-200">
+                    <div class="bg-slate-100 p-3 rounded-lg grid grid-cols-2 gap-2 text-xs font-bold text-slate-700 shadow-inner">
+                        <label class="flex items-center space-x-1.5"><input type="radio" name="rgEditMode" value="UPDATE" checked onclick="setRgFormMode('UPDATE')"><span>修改現有檔</span></label>
+                        <label class="flex items-center space-x-1.5"><input type="radio" name="rgEditMode" value="NEWLOT" onclick="setRgFormMode('NEWLOT')"><span>追加新批號</span></label>
+                        <label class="flex items-center space-x-1.5"><input type="radio" name="rgEditMode" value="NEWCATNO" onclick="setRgFormMode('NEWCATNO')"><span>追加新規格</span></label>
+                        <label class="flex items-center space-x-1.5"><input type="radio" name="rgEditMode" value="NEW" onclick="setRgFormMode('NEW')"><span>全新試劑建檔</span></label>
+                        <label id="lblOptRgImpExp" class="hidden flex items-center space-x-1.5"><input type="radio" name="rgEditMode" value="IMPORTEXPORT" onclick="setRgFormMode('IMPORTEXPORT')"><span>批次資料轉入</span></label>
+                    </div>
+                    <div class="space-y-2 text-xs" id="rgFieldsContainer">
+                        <input type="hidden" id="rg_ID">
+                        <div><label class="block font-bold text-slate-600 mb-0.5">試劑名稱 (Reagent Name)</label><input type="text" id="rg_ReagentName" class="w-full p-2 border rounded-md bg-slate-50"></div>
+                        <div><label class="block font-bold text-slate-600 mb-0.5">試劑廠牌 (Brand Name)</label><input type="text" id="rg_BrandName" class="w-full p-2 border rounded-md bg-slate-50"></div>
+                        <div><label class="block font-bold text-slate-600 mb-0.5">廠牌目錄號 (CATNO)</label><input type="text" id="rg_CATNO" class="w-full p-2 border rounded-md bg-slate-50 font-mono text-sm"></div>
+                        <div><label class="block font-bold text-slate-600 mb-0.5">生產批號 (LOTNO)</label><input type="text" id="rg_LOTNO" class="w-full p-2 border rounded-md bg-slate-50 font-mono text-sm"></div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div><label class="block font-bold text-slate-600 mb-0.5">固定入庫包裝量</label><input type="number" id="rg_FixInQty" class="w-full p-2 border rounded-md bg-slate-50"></div>
+                            <div><label class="block font-bold text-slate-600 mb-0.5">固定出庫扣除量</label><input type="number" id="rg_FixOutQty" class="w-full p-2 border rounded-md bg-slate-50"></div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div><label class="block font-bold text-slate-600 mb-0.5">目前現有庫存量</label><input type="number" id="rg_CurrentStock" class="w-full p-2 border rounded-md bg-slate-50"></div>
+                            <div><label class="block font-bold text-slate-600 mb-0.5">最低安全預警水位</label><input type="number" id="rg_AlertQty" class="w-full p-2 border rounded-md bg-slate-50"></div>
+                        </div>
+                        <div>
+                            <label class="block font-bold text-slate-600 mb-0.5">領用計算基準單位 (Unit)</label>
+                            <select id="rg_Unit" class="w-full p-2 border rounded-md bg-slate-50">
+                                <option value="ml">ml (毫升)</option><option value="ul">ul (微升)</option><option value="tube">tube (管)</option>
+                                <option value="kit">kit (盒/組)</option><option value="bottle">bottle (瓶)</option><option value="test">test (測試人份)</option>
+                            </select>
+                        </div>
+						<div class="pt-2">
+							<div class="bg-blue-50 border border-blue-200 rounded-md p-3 sticky bottom-0 z-10">
+							    <label class="flex items-center gap-3 text-sm font-bold text-slate-700">
+							        <input
+							            type="checkbox"
+							            id="rg_IsActive"
+							            checked
+							            class="w-6 h-6 accent-blue-600 shrink-0"
+							        >
+							        <span>
+							            臨床啟用此批號規格<br>
+							            <span class="text-xs text-red-600">
+							                未勾選將不計入儀表板與低庫存預警
+							            </span>
+							        </span>
+							    </label>
+							</div>
+                        </div>
+                    </div>
+                    <div class="flex space-x-2 pt-1">
+                        <button id="btn_rgSave" onclick="saveReagentMaster()" class="flex-1 bg-blue-600 text-white p-2.5 rounded-md hover:bg-blue-700 font-bold shadow text-xs transition">儲存資料設定</button>
+                        <button onclick="clearRgFields()" class="bg-slate-200 text-slate-700 px-4 rounded-md hover:bg-slate-300 font-semibold text-xs transition">重置清空</button>
+                    </div>
+                    <div id="rgAdminPanel" class="hidden border-t pt-3 space-y-2">
+                        <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider">批次匯入與導出公用程式 (管理員專用)</h4>
+                        <div class="grid grid-cols-2 gap-2">
+                            <button onclick="exportReagentMaster()" class="bg-emerald-600 text-white p-2 text-xs rounded-md font-bold hover:bg-emerald-700 transition shadow">📤 匯出資料主檔</button>
+                            <label class="bg-indigo-600 text-white p-2 text-xs rounded-md font-bold hover:bg-indigo-700 text-center cursor-pointer block shadow">
+                                📥 選取 CSV 匯入
+                                <input type="file" id="rgImportFile" accept=".csv" class="hidden" onchange="importReagentMaster(this)">
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div class="lg:col-span-2 flex flex-col h-full space-y-2">
+                    <div class="flex space-x-2">
+                        <input type="text" id="txtRgKeyword" class="flex-1 p-2 border rounded-md text-xs outline-none focus:ring-2 focus:ring-slate-400" placeholder="可輸入試劑名稱、廠牌、CATNO 或 LOTNO 快速交叉檢索...">
+                        <button onclick="searchReagentsList()" class="bg-slate-700 text-white px-5 rounded-md text-xs font-bold hover:bg-slate-800 transition">搜尋</button>
+                    </div>
+                    <div class="border rounded-lg overflow-y-auto max-h-[52vh] bg-slate-50 shadow-inner">
+                        <table class="w-full text-left text-xs border-collapse">
+                            <thead class="bg-slate-700 text-white sticky top-0 z-10">
+                                <tr>
+                                    <th class="p-2.5">試劑規格名稱</th><th class="p-2.5">CATNO</th><th class="p-2.5">LOTNO</th>
+                                    <th class="p-2.5 text-center">現量</th><th class="p-2.5">廠牌</th><th class="p-2.5 text-center">單位</th>
+                                </tr>
+                            </thead>
+                            <tbody id="rgMasterTableBody" class="cursor-pointer"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal_UserSD" class="fixed inset-0 bg-slate-900 bg-opacity-60 flex items-center justify-center z-40 hidden">
+        <div class="bg-white p-6 rounded-xl shadow-2xl max-w-5xl w-full flex flex-col max-h-[90vh]">
+            <div class="flex justify-between items-center border-b pb-3 mb-4">
+                <h2 class="text-xl font-bold text-slate-700">👥 實驗室人員帳號與資安權限管理</h2>
+                <button onclick="closeModal('UserSD')" class="text-slate-400 hover:text-slate-600 text-3xl font-light">&times;</button>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 overflow-y-auto">
+                <div class="md:col-span-1 space-y-4 border-r pr-4 border-slate-200">
+                    <div class="bg-slate-100 p-2.5 rounded-lg flex justify-around text-xs font-bold text-slate-700 shadow-inner">
+                        <label class="cursor-pointer"><input type="radio" name="userEditMode" value="UPDATE" checked onclick="setUserFormMode('UPDATE')"> 修改設定</label>
+                        <label id="lblOptUserNew" class="hidden cursor-pointer"><input type="radio" name="userEditMode" value="NEW" onclick="setUserFormMode('NEW')"> 新增帳號</label>
+                        <label id="lblOptUserDel" class="hidden cursor-pointer"><input type="radio" name="userEditMode" value="DELETE" onclick="setUserFormMode('DELETE')"> 停用註記</label>
+                    </div>
+                    <div class="space-y-2.5 text-xs">
+                        <div><label class="block font-bold text-slate-600 mb-0.5">人員唯一識別 ID </label><input type="text" id="usr_UserID" class="w-full p-2 border rounded-md bg-slate-50 font-mono"></div>
+                        <div><label class="block font-bold text-slate-600 mb-0.5">使用者姓名</label><input type="text" id="usr_UserName" class="w-full p-2 border rounded-md bg-slate-50"></div>
+                        <div><label class="block font-bold text-slate-600 mb-0.5">配置角色資安權限</label><select id="usr_UserRole" class="w-full p-2 border rounded-md bg-slate-50 outline-none"></select></div>
+                        <div>
+                            <label class="block font-bold text-slate-600 mb-0.5">人員識別證條碼編碼 / 密碼</label>
+                            <div class="relative flex items-center">
+                                <input type="password" id="usr_Account" class="w-full p-2 pr-10 border rounded-md bg-slate-50 font-mono text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                                <button id="btn_togglePassword" type="button" onclick="togglePasswordVisibility()" class="absolute right-2 text-slate-500 hover:text-slate-700 p-1 hidden focus:outline-none" title="顯示實際密碼">👁️</button>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-2 pt-1">
+                            <input type="checkbox" id="usr_IsActive" class="w-4 h-4 text-blue-600 rounded"> <label class="font-bold text-slate-700">准許該帳號登入系統</label>
+                        </div>
+                    </div>
+                    <div class="text-[11px] text-slate-400 space-y-1 bg-slate-50 p-3 rounded-lg border border-slate-100 font-mono">
+                        <div>建立日期：<span id="lblCreateTime">-</span></div>
+                        <div>異動日期：<span id="lblUpdateTime">-</span></div>
+                        <div>最後登入：<span id="lblLastLoginTime">-</span></div>
+                    </div>
+					<button id="btn_userSave" onclick="saveUserMaster()" class="w-full bg-blue-600 text-white p-2.5 rounded-md hover:bg-blue-700 font-bold shadow text-xs transition">執行異動設定</button>
+
+					<div id="userAdminPanel" class="hidden border-t pt-3 space-y-2">
+						<h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider">
+							人員清單批次匯入與匯出 管理員專用
+						</h4>
+
+						<div class="grid grid-cols-2 gap-2">
+							<button onclick="exportUserMaster()"
+									class="bg-emerald-600 text-white p-2 text-xs rounded-md font-bold hover:bg-emerald-700 transition shadow">
+								📤 匯出人員清單
+							</button>
+
+							<label class="bg-indigo-600 text-white p-2 text-xs rounded-md font-bold hover:bg-indigo-700 text-center cursor-pointer block shadow">
+								📥 選取 CSV 匯入
+								<input type="file"
+									   id="userImportFile"
+									   accept=".csv"
+									   class="hidden"
+									   onchange="importUserMaster(this)">
+							</label>
+						</div>
+					</div>
+                </div>
+                
+                <div class="md:col-span-2 flex flex-col space-y-2">
+                    <div class="flex space-x-2">
+                        <input type="text" id="txtUsrKeyword" class="flex-1 p-2 border rounded-md text-xs outline-none focus:ring-2 focus:ring-slate-400" placeholder="篩選特定使用者代碼或姓名...">
+                        <button onclick="searchUsersList()" class="bg-slate-700 text-white px-5 rounded-md text-xs font-bold hover:bg-slate-800 transition">搜尋</button>
+                    </div>
+                    <div class="border rounded-lg overflow-y-auto max-h-[52vh] shadow-inner">
+                        <table class="w-full text-left text-xs border-collapse">
+                            <thead class="bg-slate-700 text-white sticky top-0 z-10">
+                                <tr>
+                                    <th class="p-2.5">系統 UserID</th>
+                                    <th class="p-2.5">人員姓名</th>
+                                    <th class="p-2.5">角色權限</th>
+                                    <th class="p-2.5 text-center">帳號狀態</th>
+                                </tr>
+                            </thead>
+                            <tbody id="userMasterTableBody" class="cursor-pointer"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal_Report" class="fixed inset-0 bg-slate-900 bg-opacity-60 flex items-center justify-center z-40 hidden p-4 no-print">
+        <div class="bg-white p-6 rounded-xl shadow-2xl max-w-5xl w-full flex flex-col max-h-[90vh] space-y-4">
+            <div class="flex justify-between items-center border-b pb-3">
+                <h2 class="text-xl font-bold text-slate-700 flex items-center">📊 試劑進出與使用歷史明細報表</h2>
+                <button onclick="closeModal('Report')" class="text-slate-400 hover:text-slate-600 text-3xl font-light">&times;</button>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 bg-slate-50 p-4 rounded-lg border border-slate-200 items-end text-xs">
+                <div>
+                    <label class="block font-bold text-slate-600 mb-1">起始查詢日期 (Start Date)</label>
+                    <input type="date" id="rpt_StartDate" class="w-full p-2 border rounded-md font-sans text-sm bg-white">
+                </div>
+                <div>
+                    <label class="block font-bold text-slate-600 mb-1">結束查詢日期 (End Date)</label>
+                    <input type="date" id="rpt_EndDate" class="w-full p-2 border rounded-md font-sans text-sm bg-white">
+                </div>
+                <button onclick="fetchTransactionReport()" class="bg-purple-600 text-white p-2.5 rounded-md hover:bg-purple-700 font-bold shadow text-sm transition w-full">🔍 產生區段歷史紀錄</button>
+                <button onclick="exportTransactionReport()" class="bg-emerald-600 text-white p-2.5 rounded-md hover:bg-emerald-700 font-bold shadow text-sm transition w-full">📤 匯出歷史明細 CSV</button>
+            </div>
+            <div class="border rounded-lg overflow-y-auto flex-1 bg-white shadow-inner max-h-[50vh]">
+                <table class="w-full text-left text-xs border-collapse">
+                    <thead class="bg-slate-700 text-white sticky top-0 z-10 text-center">
+                        <tr>
+                            <th class="p-2.5 text-left">異動簽核時間</th>
+                            <th class="p-2.5 text-left">試劑品名規格</th>
+                            <th class="p-2.5">目錄號 (CATNO)</th>
+                            <th class="p-2.5">生產批號 (LOTNO)</th>
+                            <th class="p-2.5">異動類別</th>
+                            <th class="p-2.5">異動數量</th>
+                            <th class="p-2.5">經手人代碼</th>
+                        </tr>
+                    </thead>
+                    <tbody id="reportTableBody" class="text-center">
+                        <tr><td colspan="7" class="p-8 text-slate-400 font-medium">請選擇上方日期區段並點選產生報表...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal_LabelPreview" class="fixed inset-0 bg-slate-900 bg-opacity-70 flex items-center justify-center z-50 hidden no-print">
+        <div class="bg-white p-6 rounded-xl shadow-2xl max-w-md w-full space-y-4 border border-slate-200">
+            <div class="flex justify-between items-center border-b pb-3">
+                <h2 class="text-base font-bold text-slate-700 flex items-center">👁️ 標籤實體排版微調即時預覽</h2>
+                <button onclick="closeModal('LabelPreview')" class="text-slate-400 hover:text-slate-600 text-2xl font-light focus:outline-none">&times;</button>
+            </div>
+            
+            <div class="bg-slate-100 p-8 rounded-lg flex items-center justify-center border border-slate-200 shadow-inner min-h-[180px]">
+                <div id="previewCanvasContainer" class="bg-white shadow-md border border-slate-300 overflow-hidden relative transition-all duration-200"></div>
+            </div>
+            
+            <div class="flex space-x-2 text-xs">
+                <button onclick="closeModal('LabelPreview')" class="bg-slate-200 text-slate-700 px-4 py-2.5 rounded-md hover:bg-slate-300 font-semibold flex-1 transition">返回調整</button>
+                <button onclick="closeModal('LabelPreview'); triggerLabelPrint();" class="bg-blue-600 text-white px-4 py-2.5 rounded-md hover:bg-blue-700 font-bold flex-1 shadow transition">🖨️ 確認無誤，發送列印</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="printCanvas" class="hidden print-area"></div>
+
+    <footer class="bg-slate-100 text-center text-xs text-slate-400 p-3 border-t no-print">
+        試劑庫存管理系統 Web 移轉版 &copy; 2026 
+    </footer>
+
+    <script src="app.js?v=20260630-4"></script>
+    <script src="enhancements.js?v=20260630-4"></script>
+</body>
+</html>

@@ -1,0 +1,65 @@
+/* ====================================================================
+   SATO 50mm × 30mm 標籤紙
+   需求：只印一張、四邊 1.5mm
+   ==================================================================== */
+
+@media print {
+    .no-print, header, main, footer, button, nav {
+        display: none !important;
+    }
+
+    html, body {
+        width: 50mm !important;
+        height: 30mm !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+        background: #fff !important;
+    }
+
+    .print-area {
+        display: block !important;
+        width: 50mm !important;
+        height: 30mm !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+    }
+}
+
+@page {
+    size: 50mm 30mm;
+    margin: 0;
+}
+
+.label-page {
+    width: 50mm !important;
+    height: 30mm !important;
+    padding: 1.5mm 0mm 0mm 0mm !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+    background: #fff;
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+    display: grid;
+}
+
+.layout-一大 {
+    grid-template-columns: 1fr;
+    align-items: start;
+    justify-items: center;
+}
+
+.layout-左1右2,
+.layout-左1右3 {
+    grid-template-columns: 50% 30%;
+    align-items: start;
+    justify-items: center;
+}
+
+.label-page img {
+    display: block !important;
+    object-fit: contain !important;
+    max-width: 18mm !important;
+    max-height: 18mm !important;
+}
