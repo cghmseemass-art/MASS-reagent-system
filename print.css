@@ -1,4 +1,5 @@
-/* ====================================================================
+/* MASS-reagent-system-main/print.css
+   ====================================================================
    SATO 50mm × 30mm 標籤紙
    需求：只印一張、四邊 1.5mm
    ==================================================================== */
@@ -60,6 +61,4 @@
 .label-page img {
     display: block !important;
     object-fit: contain !important;
-    max-width: 18mm !important;
-    max-height: 18mm !important;
 }
