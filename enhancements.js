@@ -169,4 +169,65 @@ function parseScan(raw){try{const p=JSON.parse(raw);if(p.v===2&&p.type==='reagen
 handleTransactionScan=async function(){const raw=txtReagentBarcode.value.trim();if(!raw)return;const p=parseScan(raw),txMode=document.querySelector('input[name="txMode"]:checked').value;try{if(p.formula){formulaScan.value=raw;openAdvanced();return;}const d=await api('/api/transaction/execute',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...p,txMode,operator:currentUser.account,userRole:currentUser.role})});alert(d.message);fetchStockData();}catch(e){if(e.code==='NEED_MANUAL_QTY'){const value=prompt(e.message,'0');if(value!==null&&Number(value)>=0){try{const d=await api('/api/transaction/execute-manual',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...p,txMode,qty:Number(value),operator:currentUser.account})});alert(d.message);fetchStockData();}catch(x){alert('交易中止：'+x.message);}}}else alert('交易中止：'+e.message);}finally{txtReagentBarcode.value='';}};
 
 function labelCaption(){if(!selectedLabel)return barcodeText.value;const r=selectedLabel,c=orgData.campuses.find(x=>x.ID===r.CampusID)?.Name||r.CampusID,g=orgData.groups.find(x=>x.ID===r.GroupID)?.Name||r.GroupID,l=orgData.locations.find(x=>x.ID===r.LocationID)?.Name||r.LocationID;return `${r.BrandName||''} ${r.CATNO}｜LOT ${r.LOTNO}\n${c}｜${g}｜${l}`;}
-buildLabelInnerHTML=function(layoutType,qrUrl){const copies=layoutType==='一大'?1:layoutType==='左1右2'?3:4;return `<div style="display:grid;grid-template-columns:${copies===1?'1fr':'1fr 1fr'};gap:1mm;width:100%;height:100%;align-items:center">${Array.from({length:copies},(_,i)=>`<div style="text-align:center;overflow:hidden"><img src="${qrUrl}" style="width:${i?'12mm':'18mm'};margin:auto"><div style="font-size:${i?'4.5pt':'5.5pt'};font-weight:700;line-height:1.15;white-space:pre-line">${esc(labelCaption())}</div></div>`).join('')}</div>`;};
+buildLabelInnerHTML = function(layoutType, qrUrl) {
+    const caption = esc(labelCaption());
+
+    if (layoutType === "一大") {
+        return `
+            <div style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;text-align:center;overflow:hidden;">
+                <img src="${qrUrl}" style="width:18mm;height:18mm;margin-top:1mm;">
+                <div style="font-size:5.5pt;font-weight:700;line-height:1.15;white-space:pre-line;margin-top:0.5mm;">
+                    ${caption}
+                </div>
+            </div>
+        `;
+    }
+
+    if (layoutType === "左1右2") {
+        return `
+            <div style="display:grid;grid-template-columns:55% 45%;width:100%;height:100%;gap:0.5mm;overflow:hidden;">
+                <div style="text-align:center;border-right:1px dashed #ccc;overflow:hidden;">
+                    <img src="${qrUrl}" style="width:15mm;height:15mm;margin:auto;">
+                    <div style="font-size:4.5pt;font-weight:700;line-height:1.1;white-space:pre-line;">${caption}</div>
+                </div>
+                <div style="display:grid;grid-template-rows:1fr 1fr;overflow:hidden;">
+                    <div style="text-align:center;border-bottom:1px dashed #ccc;overflow:hidden;">
+                        <img src="${qrUrl}" style="width:8mm;height:8mm;margin:auto;">
+                        <div style="font-size:3.5pt;font-weight:700;line-height:1.05;white-space:pre-line;">${caption}</div>
+                    </div>
+                    <div style="text-align:center;overflow:hidden;">
+                        <img src="${qrUrl}" style="width:8mm;height:8mm;margin:auto;">
+                        <div style="font-size:3.5pt;font-weight:700;line-height:1.05;white-space:pre-line;">${caption}</div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    if (layoutType === "左1右3") {
+        return `
+            <div style="display:grid;grid-template-columns:50% 50%;width:100%;height:100%;gap:0.5mm;overflow:hidden;">
+                <div style="text-align:center;border-right:1px dashed #ccc;overflow:hidden;">
+                    <img src="${qrUrl}" style="width:14mm;height:14mm;margin:auto;">
+                    <div style="font-size:4.2pt;font-weight:700;line-height:1.05;white-space:pre-line;">${caption}</div>
+                </div>
+                <div style="display:grid;grid-template-rows:1fr 1fr 1fr;overflow:hidden;">
+                    <div style="text-align:center;border-bottom:1px dashed #ccc;overflow:hidden;">
+                        <img src="${qrUrl}" style="width:6.5mm;height:6.5mm;margin:auto;">
+                        <div style="font-size:3pt;font-weight:700;line-height:1;white-space:pre-line;">${caption}</div>
+                    </div>
+                    <div style="text-align:center;border-bottom:1px dashed #ccc;overflow:hidden;">
+                        <img src="${qrUrl}" style="width:6.5mm;height:6.5mm;margin:auto;">
+                        <div style="font-size:3pt;font-weight:700;line-height:1;white-space:pre-line;">${caption}</div>
+                    </div>
+                    <div style="text-align:center;overflow:hidden;">
+                        <img src="${qrUrl}" style="width:6.5mm;height:6.5mm;margin:auto;">
+                        <div style="font-size:3pt;font-weight:700;line-height:1;white-space:pre-line;">${caption}</div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    return "";
+};
