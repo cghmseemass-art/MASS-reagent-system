@@ -318,22 +318,25 @@ async function loadQRLOTNO(reagentName, catNo) {
 function putBarcodeToPrintLabel() {
     const rName = document.getElementById("lstReagentName").value;
     const catNo = document.getElementById("lstCATNO").value;
-    const lotNo = document.getElementById("lstLOTNO").value;
 
-    if (!catNo || !lotNo) {
-        alert("防呆機制提示：請確認已完整選取目錄號 (CATNO) 與生產批號 (LOTNO)！");
+    const lotSelect = document.getElementById("lstLOTNO");
+    const lotRaw = lotSelect.value || "";
+    const lotNo = lotRaw.split("|")[0].trim();
+
+    if (!rName || !catNo || !lotNo) {
+        alert("防呆機制提示：請確認已完整選取試劑名稱、CATNO 與 LOTNO！");
         return;
     }
 
-	const barcodeText = `${catNo}|${lotNo}`;
-	document.getElementById("barcodeText").value = barcodeText;
+    const barcodeText = `${catNo}|${lotNo}`;
+    document.getElementById("barcodeText").value = barcodeText;
 
-	currentPrintLabelMeta = {
-		title: rName,
-		subtitle: `CATNO: ${catNo}  LOTNO: ${lotNo}`
-	};
+    currentPrintLabelMeta = {
+        title: rName,
+        subtitle: `CATNO: ${catNo}  LOTNO: ${lotNo}`
+    };
 
-	closeModal("SelectQR");
+    closeModal("SelectQR");
 
     if (confirm(`已成功擷取該品項規格資原始碼：\n${barcodeText}\n\n是否立即執行條碼機畫布出圖與精密排版？`)) {
         generateLabelPreview();
