@@ -92,28 +92,59 @@ putBarcodeToPrintLabel = async function() {
         return alert("請選擇批號與位置");
     }
 
-    const reagentID = o.dataset.reagentId;
-    const lotNo = o.dataset.lotNo || o.value;
+    const clean = v => String(v ?? "")
+        .replace(/\u3000/g, " ")
+        .trim()
+        .toUpperCase();
 
-    let r = null;
+    const reagentID = o.dataset.reagentId;
+    const reagentName = lstReagentName.value;
+    const catNo = lstCATNO.value;
+    const lotNo = o.dataset.lotNo || o.value;
 
     const list = await api(scoped('/api/reagents/search'));
 
+    let r = null;
+
+    // 1. 先用 ID 找
     if (reagentID) {
-        r = list.find(x => String(x.ID) === String(reagentID));
+        r = list.find(x => clean(x.ID) === clean(reagentID));
     }
 
-    // 若後端 QR lotno 沒有回 ReagentID，改用名稱 + CATNO + LOTNO 找
+    // 2. 再用 名稱 + CATNO + LOTNO 找
     if (!r) {
         r = list.find(x =>
-            String(x.ReagentName) === String(lstReagentName.value) &&
-            String(x.CATNO) === String(lstCATNO.value) &&
-            String(x.LOTNO) === String(lotNo)
+            clean(x.ReagentName) === clean(reagentName) &&
+            clean(x.CATNO) === clean(catNo) &&
+            clean(x.LOTNO) === clean(lotNo)
+        );
+    }
+
+    // 3. 再放寬：只用 CATNO + LOTNO 找
+    if (!r) {
+        r = list.find(x =>
+            clean(x.CATNO) === clean(catNo) &&
+            clean(x.LOTNO) === clean(lotNo)
         );
     }
 
     if (!r) {
-        return alert("找不到試劑");
+        console.log("找不到試劑，比對資訊：", {
+            reagentID,
+            reagentName,
+            catNo,
+            lotNo,
+            list
+        });
+
+        return alert(
+            "找不到試劑\n\n" +
+            "目前選擇：\n" +
+            "品名：" + reagentName + "\n" +
+            "CATNO：" + catNo + "\n" +
+            "LOTNO：" + lotNo + "\n\n" +
+            "請按 F12 查看 Console 比對資訊。"
+        );
     }
 
     const payload = {
@@ -128,8 +159,6 @@ putBarcodeToPrintLabel = async function() {
     };
 
     barcodeText.value = JSON.stringify(payload);
-
-    // 這個會讓 QR 下方顯示試劑資訊
     selectedLabel = r;
 
     closeModal("SelectQR");
