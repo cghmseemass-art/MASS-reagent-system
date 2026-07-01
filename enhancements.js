@@ -170,14 +170,19 @@ handleTransactionScan=async function(){const raw=txtReagentBarcode.value.trim();
 
 function labelCaption(){if(!selectedLabel)return barcodeText.value;const r=selectedLabel,c=orgData.campuses.find(x=>x.ID===r.CampusID)?.Name||r.CampusID,g=orgData.groups.find(x=>x.ID===r.GroupID)?.Name||r.GroupID,l=orgData.locations.find(x=>x.ID===r.LocationID)?.Name||r.LocationID;return `${r.BrandName||''} ${r.CATNO}｜LOT ${r.LOTNO}\n${c}｜${g}｜${l}`;}
 buildLabelInnerHTML = function(layoutType, qrUrl) {
-    const caption = esc(labelCaption());
+    const fullText = esc(labelCaption());
+    const shortText = fullText
+        .replace(/｜/g, "\n")
+        .split("\n")
+        .slice(0, 3)
+        .join("\n");
 
     if (layoutType === "一大") {
         return `
             <div style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;text-align:center;overflow:hidden;">
                 <img src="${qrUrl}" style="width:18mm;height:18mm;margin-top:1mm;">
                 <div style="font-size:5.5pt;font-weight:700;line-height:1.15;white-space:pre-line;margin-top:0.5mm;">
-                    ${caption}
+                    ${fullText}
                 </div>
             </div>
         `;
@@ -185,19 +190,24 @@ buildLabelInnerHTML = function(layoutType, qrUrl) {
 
     if (layoutType === "左1右2") {
         return `
-            <div style="display:grid;grid-template-columns:55% 45%;width:100%;height:100%;gap:0.5mm;overflow:hidden;">
-                <div style="text-align:center;border-right:1px dashed #ccc;overflow:hidden;">
-                    <img src="${qrUrl}" style="width:15mm;height:15mm;margin:auto;">
-                    <div style="font-size:4.5pt;font-weight:700;line-height:1.1;white-space:pre-line;">${caption}</div>
+            <div style="display:grid;grid-template-columns:55% 45%;width:100%;height:100%;overflow:hidden;">
+                <div style="display:flex;align-items:center;justify-content:center;border-right:1px dashed #ccc;overflow:hidden;">
+                    <img src="${qrUrl}" style="width:19mm;height:19mm;">
                 </div>
-                <div style="display:grid;grid-template-rows:1fr 1fr;overflow:hidden;">
-                    <div style="text-align:center;border-bottom:1px dashed #ccc;overflow:hidden;">
-                        <img src="${qrUrl}" style="width:8mm;height:8mm;margin:auto;">
-                        <div style="font-size:3.5pt;font-weight:700;line-height:1.05;white-space:pre-line;">${caption}</div>
+
+                <div style="display:grid;grid-template-rows:1fr 1fr;height:100%;overflow:hidden;">
+                    <div style="display:flex;align-items:center;gap:0.5mm;border-bottom:1px dashed #ccc;overflow:hidden;">
+                        <img src="${qrUrl}" style="width:8.5mm;height:8.5mm;flex-shrink:0;">
+                        <div style="font-size:3.2pt;font-weight:700;line-height:1.05;white-space:pre-line;text-align:left;overflow:hidden;">
+                            ${shortText}
+                        </div>
                     </div>
-                    <div style="text-align:center;overflow:hidden;">
-                        <img src="${qrUrl}" style="width:8mm;height:8mm;margin:auto;">
-                        <div style="font-size:3.5pt;font-weight:700;line-height:1.05;white-space:pre-line;">${caption}</div>
+
+                    <div style="display:flex;align-items:center;gap:0.5mm;overflow:hidden;">
+                        <img src="${qrUrl}" style="width:8.5mm;height:8.5mm;flex-shrink:0;">
+                        <div style="font-size:3.2pt;font-weight:700;line-height:1.05;white-space:pre-line;text-align:left;overflow:hidden;">
+                            ${shortText}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -206,24 +216,20 @@ buildLabelInnerHTML = function(layoutType, qrUrl) {
 
     if (layoutType === "左1右3") {
         return `
-            <div style="display:grid;grid-template-columns:50% 50%;width:100%;height:100%;gap:0.5mm;overflow:hidden;">
-                <div style="text-align:center;border-right:1px dashed #ccc;overflow:hidden;">
-                    <img src="${qrUrl}" style="width:14mm;height:14mm;margin:auto;">
-                    <div style="font-size:4.2pt;font-weight:700;line-height:1.05;white-space:pre-line;">${caption}</div>
+            <div style="display:grid;grid-template-columns:50% 50%;width:100%;height:100%;overflow:hidden;">
+                <div style="display:flex;align-items:center;justify-content:center;border-right:1px dashed #ccc;overflow:hidden;">
+                    <img src="${qrUrl}" style="width:17mm;height:17mm;">
                 </div>
-                <div style="display:grid;grid-template-rows:1fr 1fr 1fr;overflow:hidden;">
-                    <div style="text-align:center;border-bottom:1px dashed #ccc;overflow:hidden;">
-                        <img src="${qrUrl}" style="width:6.5mm;height:6.5mm;margin:auto;">
-                        <div style="font-size:3pt;font-weight:700;line-height:1;white-space:pre-line;">${caption}</div>
-                    </div>
-                    <div style="text-align:center;border-bottom:1px dashed #ccc;overflow:hidden;">
-                        <img src="${qrUrl}" style="width:6.5mm;height:6.5mm;margin:auto;">
-                        <div style="font-size:3pt;font-weight:700;line-height:1;white-space:pre-line;">${caption}</div>
-                    </div>
-                    <div style="text-align:center;overflow:hidden;">
-                        <img src="${qrUrl}" style="width:6.5mm;height:6.5mm;margin:auto;">
-                        <div style="font-size:3pt;font-weight:700;line-height:1;white-space:pre-line;">${caption}</div>
-                    </div>
+
+                <div style="display:grid;grid-template-rows:1fr 1fr 1fr;height:100%;overflow:hidden;">
+                    ${[1,2,3].map((_,i)=>`
+                        <div style="display:flex;align-items:center;gap:0.4mm;${i<2?'border-bottom:1px dashed #ccc;':''}overflow:hidden;">
+                            <img src="${qrUrl}" style="width:6.5mm;height:6.5mm;flex-shrink:0;">
+                            <div style="font-size:2.7pt;font-weight:700;line-height:1;white-space:pre-line;text-align:left;overflow:hidden;">
+                                ${shortText}
+                            </div>
+                        </div>
+                    `).join("")}
                 </div>
             </div>
         `;
