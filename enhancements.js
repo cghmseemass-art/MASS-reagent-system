@@ -15,6 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
   unitBlock?.insertAdjacentHTML('afterend', `<div class="grid grid-cols-1 gap-2 border-t pt-2"><label class="font-bold">院區</label><select id="rg_CampusID" class="border p-2 rounded"></select><label class="font-bold">組別</label><select id="rg_GroupID" class="border p-2 rounded"></select><label class="font-bold">擺放位置</label><select id="rg_LocationID" class="border p-2 rounded"></select></div>`);
   document.getElementById('usr_UserRole')?.parentElement?.insertAdjacentHTML('afterend', `<div><label class="block font-bold text-slate-600">院區</label><select id="usr_CampusID" class="w-full border p-2 rounded"></select></div><div><label class="block font-bold text-slate-600">組別</label><select id="usr_GroupID" class="w-full border p-2 rounded"></select></div>`);
   loadOrg().catch(console.error);
+  initQRSelectEnhancement();
 });
 
 function advancedModal(){return `<div id="modal_Advanced" class="fixed inset-0 bg-slate-900/70 z-50 hidden p-4 overflow-auto"><div class="bg-white max-w-7xl mx-auto my-4 rounded-xl shadow-2xl p-5 space-y-5">
@@ -52,6 +53,130 @@ function refreshBusinessOrgSelects(){setOptions('rg_CampusID',orgData.campuses);
 document.addEventListener('change',e=>{if(['rg_CampusID','rg_GroupID','usr_CampusID'].includes(e.target.id))refreshBusinessOrgSelects();});
 async function saveOrg(type){const ids={campus:['advCampusName'],group:['advGroupName','advGroupCampus'],location:['advLocName','advLocCampus','advLocGroup']}[type],Name=document.getElementById(ids[0]).value;const b={type,Name};if(type!=='campus')b.CampusID=document.getElementById(ids[1]).value;if(type==='location')b.GroupID=document.getElementById(ids[2]).value;await api('/api/master-data/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});document.getElementById(ids[0]).value='';await loadOrg();}
 
+let qrSelectMode = "reagent";
+
+function initQRSelectEnhancement() {
+    const modal = document.getElementById("modal_SelectQR");
+    if (!modal) return;
+
+    // 手機版修正：外層可捲動
+    modal.className =
+        "fixed inset-0 bg-slate-900 bg-opacity-60 flex items-start md:items-center justify-center z-40 hidden p-3 overflow-y-auto";
+
+    const panel = modal.querySelector(".bg-white");
+    if (panel) {
+        panel.className =
+            "bg-white p-4 md:p-6 rounded-xl shadow-2xl max-w-5xl w-full space-y-4 max-h-[92vh] overflow-y-auto my-3 md:my-0";
+    }
+
+    const title = modal.querySelector("h2");
+    if (title) title.innerText = "🔍 選擇 QR Code 條碼來源";
+
+    const reagentGrid = modal.querySelector(".grid.grid-cols-1.md\\:grid-cols-4");
+    if (!reagentGrid) return;
+
+    reagentGrid.id = "qrReagentPickerGrid";
+    reagentGrid.className = "grid grid-cols-1 md:grid-cols-4 gap-3 md:gap-4";
+
+    // 手機版 select 高度調整，避免太長
+    ["lstReagentName", "lstCATNO", "lstLOTNO"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.className = "w-full border rounded-md p-1 h-40 md:h-72 text-sm focus:ring-2 focus:ring-blue-400 outline-none";
+        }
+    });
+
+    const firstSelect = document.getElementById("lstReagentName");
+    if (firstSelect) firstSelect.className = "w-full border rounded-md p-1 h-40 md:h-64 text-sm focus:ring-2 focus:ring-blue-400 outline-none";
+
+    reagentGrid.insertAdjacentHTML("beforebegin", `
+        <div id="qrModeTabs" class="grid grid-cols-2 gap-2 bg-slate-100 p-2 rounded-lg">
+            <button id="btnQrModeReagent"
+                    type="button"
+                    onclick="setQRSelectMode('reagent')"
+                    class="bg-blue-600 text-white p-2 rounded-md font-bold text-sm">
+                🧪 單一試劑
+            </button>
+            <button id="btnQrModeFormula"
+                    type="button"
+                    onclick="setQRSelectMode('formula')"
+                    class="bg-white text-slate-700 p-2 rounded-md font-bold text-sm border">
+                🧫 複方
+            </button>
+        </div>
+    `);
+
+    reagentGrid.insertAdjacentHTML("afterend", `
+        <div id="qrFormulaPickerPanel" class="hidden space-y-3">
+            <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-slate-700">
+                請選擇要列印 QR Code 的複方。列印後掃描此 QR，可進行複方配製扣庫存。
+            </div>
+
+            <div class="space-y-2">
+                <label class="block text-xs font-bold text-slate-600 uppercase">複方清單</label>
+                <select id="lstFormulaQR"
+                        size="10"
+                        class="w-full border rounded-md p-2 h-56 text-sm focus:ring-2 focus:ring-blue-400 outline-none">
+                </select>
+            </div>
+
+            <button onclick="putBarcodeToPrintLabel()"
+                    class="w-full bg-blue-600 text-white p-3 rounded-md hover:bg-blue-700 font-bold shadow text-sm transition">
+                確認帶入主介面
+            </button>
+        </div>
+    `);
+}
+
+function setQRSelectMode(mode) {
+    qrSelectMode = mode;
+
+    const reagentGrid = document.getElementById("qrReagentPickerGrid");
+    const formulaPanel = document.getElementById("qrFormulaPickerPanel");
+    const btnReagent = document.getElementById("btnQrModeReagent");
+    const btnFormula = document.getElementById("btnQrModeFormula");
+
+    if (!reagentGrid || !formulaPanel) return;
+
+    if (mode === "formula") {
+        reagentGrid.classList.add("hidden");
+        formulaPanel.classList.remove("hidden");
+
+        btnReagent.className = "bg-white text-slate-700 p-2 rounded-md font-bold text-sm border";
+        btnFormula.className = "bg-blue-600 text-white p-2 rounded-md font-bold text-sm";
+
+        loadQRFormulas();
+    } else {
+        reagentGrid.classList.remove("hidden");
+        formulaPanel.classList.add("hidden");
+
+        btnReagent.className = "bg-blue-600 text-white p-2 rounded-md font-bold text-sm";
+        btnFormula.className = "bg-white text-slate-700 p-2 rounded-md font-bold text-sm border";
+    }
+}
+
+async function loadQRFormulas() {
+    const sel = document.getElementById("lstFormulaQR");
+    if (!sel) return;
+
+    sel.innerHTML = "";
+
+    const list = await api("/api/formulas");
+    window.formulas = list;
+
+    if (!Array.isArray(list) || list.length === 0) {
+        sel.add(new Option("目前尚無複方資料", ""));
+        return;
+    }
+
+    list.forEach(f => {
+        const text = `${f.ID}｜${f.Name}｜成分 ${f.Components?.length || 0} 項`;
+        const opt = new Option(text, f.ID);
+        opt.dataset.formulaName = f.Name || "";
+        sel.add(opt);
+    });
+}
+
 function reagentOptions(){return (window.advancedReagents||[]).map(r=>`<option value="${r.ID}" data-unit="${esc(r.BaseUnit||r.Unit)}">${esc(r.ReagentName)}｜${esc(r.CATNO)}｜${esc(r.LOTNO)}｜${esc(r.LocationID)} (${r.CurrentStock} ${esc(r.BaseUnit||r.Unit)})</option>`).join('');}
 async function addComponent(c={}){if(document.querySelectorAll('.component-row').length>=20)return alert('最多 20 種成分');if(!window.advancedReagents)window.advancedReagents=await api('/api/reagents/search');componentRows.insertAdjacentHTML('beforeend',`<div class="component-row grid grid-cols-[1fr_100px_100px_40px] gap-2"><select class="c-r border p-2">${reagentOptions()}</select><input class="c-q border p-2" type="number" min="0" step="0.001" value="${c.Qty||''}" placeholder="量"><input class="c-u border p-2" value="${esc(c.Unit||'')}" placeholder="單位"><button onclick="this.parentElement.remove()" class="text-red-600">✕</button></div>`);const row=componentRows.lastElementChild;if(c.ReagentID)row.querySelector('.c-r').value=c.ReagentID;if(!c.Unit){const o=row.querySelector('.c-r').selectedOptions[0];row.querySelector('.c-u').value=o?.dataset.unit||'';}row.querySelector('.c-r').onchange=e=>row.querySelector('.c-u').value=e.target.selectedOptions[0]?.dataset.unit||'';}
 function clearFormula(){formulaID.value='';formulaName.value='';yieldQty.value=1;yieldUnit.value='';componentRows.innerHTML='';addComponent();}
@@ -86,6 +211,47 @@ loadQRLOTNO = async function(name, cat) {
     });
 };
 putBarcodeToPrintLabel = async function() {
+
+    // =========================
+    // 複方 QR
+    // =========================
+    if (qrSelectMode === "formula") {
+        const sel = document.getElementById("lstFormulaQR");
+        const formulaID = sel?.value || "";
+
+        if (!formulaID) {
+            return alert("請先選擇複方。");
+        }
+
+        const list = window.formulas || await api("/api/formulas");
+        const f = list.find(x => String(x.ID) === String(formulaID));
+
+        if (!f) {
+            return alert("找不到複方資料。");
+        }
+
+        const payload = {
+            v: 2,
+            type: "formula",
+            id: f.ID
+        };
+
+        barcodeText.value = JSON.stringify(payload);
+
+        selectedLabel = {
+            LabelType: "formula",
+            ID: f.ID,
+            Name: f.Name
+        };
+
+        closeModal("SelectQR");
+        generateLabelPreview();
+        return;
+    }
+
+    // =========================
+    // 單一試劑 QR
+    // =========================
     const o = lstLOTNO.selectedOptions[0];
 
     if (!o) {
@@ -102,16 +268,14 @@ putBarcodeToPrintLabel = async function() {
     const catNo = lstCATNO.value;
     const lotNo = o.dataset.lotNo || o.value;
 
-    const list = await api(scoped('/api/reagents/search'));
+    const list = await api(scoped("/api/reagents/search"));
 
     let r = null;
 
-    // 1. 先用 ID 找
     if (reagentID) {
         r = list.find(x => clean(x.ID) === clean(reagentID));
     }
 
-    // 2. 再用 名稱 + CATNO + LOTNO 找
     if (!r) {
         r = list.find(x =>
             clean(x.ReagentName) === clean(reagentName) &&
@@ -120,7 +284,6 @@ putBarcodeToPrintLabel = async function() {
         );
     }
 
-    // 3. 再放寬：只用 CATNO + LOTNO 找
     if (!r) {
         r = list.find(x =>
             clean(x.CATNO) === clean(catNo) &&
@@ -129,23 +292,26 @@ putBarcodeToPrintLabel = async function() {
     }
 
     if (!r) {
-        console.log("找不到試劑，比對資訊：", {
-            reagentID,
-            reagentName,
-            catNo,
-            lotNo,
-            list
-        });
-
-        return alert(
-            "找不到試劑\n\n" +
-            "目前選擇：\n" +
-            "品名：" + reagentName + "\n" +
-            "CATNO：" + catNo + "\n" +
-            "LOTNO：" + lotNo + "\n\n" +
-            "請按 F12 查看 Console 比對資訊。"
-        );
+        return alert("找不到試劑");
     }
+
+    const payload = {
+        v: 2,
+        type: "reagent",
+        id: r.ID,
+        cat: r.CATNO,
+        lot: r.LOTNO,
+        campus: r.CampusID,
+        group: r.GroupID,
+        location: r.LocationID
+    };
+
+    barcodeText.value = JSON.stringify(payload);
+    selectedLabel = r;
+
+    closeModal("SelectQR");
+    generateLabelPreview();
+};
 
     const payload = {
         v: 2,
@@ -168,7 +334,20 @@ putBarcodeToPrintLabel = async function() {
 function parseScan(raw){try{const p=JSON.parse(raw);if(p.v===2&&p.type==='reagent')return{reagentId:p.id,campusID:p.campus,groupID:p.group,locationID:p.location,catNo:p.cat,lotNo:p.lot};if(p.type==='formula')return{formula:p};}catch{}const [catNo,lotNo]=raw.split('|').map(x=>x.trim());return{catNo,lotNo,campusID:currentUser.campusID,groupID:currentUser.groupID};}
 handleTransactionScan=async function(){const raw=txtReagentBarcode.value.trim();if(!raw)return;const p=parseScan(raw),txMode=document.querySelector('input[name="txMode"]:checked').value;try{if(p.formula){formulaScan.value=raw;openAdvanced();return;}const d=await api('/api/transaction/execute',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...p,txMode,operator:currentUser.account,userRole:currentUser.role})});alert(d.message);fetchStockData();}catch(e){if(e.code==='NEED_MANUAL_QTY'){const value=prompt(e.message,'0');if(value!==null&&Number(value)>=0){try{const d=await api('/api/transaction/execute-manual',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...p,txMode,qty:Number(value),operator:currentUser.account})});alert(d.message);fetchStockData();}catch(x){alert('交易中止：'+x.message);}}}else alert('交易中止：'+e.message);}finally{txtReagentBarcode.value='';}};
 
-function labelCaption(){if(!selectedLabel)return barcodeText.value;const r=selectedLabel,c=orgData.campuses.find(x=>x.ID===r.CampusID)?.Name||r.CampusID,g=orgData.groups.find(x=>x.ID===r.GroupID)?.Name||r.GroupID,l=orgData.locations.find(x=>x.ID===r.LocationID)?.Name||r.LocationID;return `${r.BrandName||''} ${r.CATNO}｜LOT ${r.LOTNO}\n${c}｜${g}｜${l}`;}
+function labelCaption() {
+    if (!selectedLabel) return barcodeText.value;
+
+    if (selectedLabel.LabelType === "formula") {
+        return `${selectedLabel.Name}\n複方 QR\n${selectedLabel.ID}`;
+    }
+
+    const r = selectedLabel;
+    const c = orgData.campuses.find(x => x.ID === r.CampusID)?.Name || r.CampusID;
+    const g = orgData.groups.find(x => x.ID === r.GroupID)?.Name || r.GroupID;
+    const l = orgData.locations.find(x => x.ID === r.LocationID)?.Name || r.LocationID;
+
+    return `${r.ReagentName || r.BrandName || ""} ${r.CATNO}｜LOT ${r.LOTNO}\n${c}｜${g}｜${l}`;
+}
 
 buildLabelInnerHTML = function(layoutType, qrUrl) {
     const text = labelCaption();

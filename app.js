@@ -110,7 +110,10 @@ function openModal(id) {
                 document.getElementById("txtReagentBarcode").focus();
             }
         }
-        if (id === "SelectQR") loadQRReagentNames("");
+        if (id === "SelectQR") {
+			if (typeof setQRSelectMode === "function") setQRSelectMode("reagent");
+			loadQRReagentNames("");
+		}
         if (id === "RgStandard") { initRgForm(); searchReagentsList(); }
         if (id === "UserSD") { initUserForm(); searchUsersList(); }
         
