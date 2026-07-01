@@ -170,66 +170,171 @@ handleTransactionScan=async function(){const raw=txtReagentBarcode.value.trim();
 
 function labelCaption(){if(!selectedLabel)return barcodeText.value;const r=selectedLabel,c=orgData.campuses.find(x=>x.ID===r.CampusID)?.Name||r.CampusID,g=orgData.groups.find(x=>x.ID===r.GroupID)?.Name||r.GroupID,l=orgData.locations.find(x=>x.ID===r.LocationID)?.Name||r.LocationID;return `${r.BrandName||''} ${r.CATNO}｜LOT ${r.LOTNO}\n${c}｜${g}｜${l}`;}
 buildLabelInnerHTML = function(layoutType, qrUrl) {
-    const fullText = esc(labelCaption());
-    const shortText = fullText
+    const text = labelCaption();
+    const lines = String(text || "")
         .replace(/｜/g, "\n")
-        .split("\n")
-        .slice(0, 3)
-        .join("\n");
+        .split(/\r?\n/)
+        .map(x => x.trim())
+        .filter(Boolean);
+
+    const mainText = esc(lines.slice(0, 4).join("\n"));
+    const smallText = esc(lines.slice(0, 4).join("\n"));
+
+    const bigBlock = `
+        <div style="
+            width:24mm;
+            height:28mm;
+            display:flex;
+            flex-direction:column;
+            align-items:center;
+            justify-content:flex-start;
+            overflow:hidden;
+            text-align:center;
+        ">
+            <img src="${qrUrl}" style="width:19mm;height:19mm;margin-top:1mm;">
+            <div style="
+                width:23mm;
+                font-size:4.6pt;
+                font-weight:700;
+                line-height:1.05;
+                white-space:pre-line;
+                word-break:break-all;
+                margin-top:0.6mm;
+                overflow:hidden;
+            ">${mainText}</div>
+        </div>
+    `;
+
+    const smallBlock = `
+        <div style="
+            width:21mm;
+            height:13.5mm;
+            display:grid;
+            grid-template-columns:7.5mm 13mm;
+            column-gap:0.5mm;
+            align-items:center;
+            overflow:hidden;
+            box-sizing:border-box;
+        ">
+            <img src="${qrUrl}" style="width:7.5mm;height:7.5mm;">
+            <div style="
+                font-size:3.4pt;
+                font-weight:700;
+                line-height:1.0;
+                white-space:pre-line;
+                word-break:break-all;
+                text-align:left;
+                overflow:hidden;
+            ">${smallText}</div>
+        </div>
+    `;
 
     if (layoutType === "一大") {
         return `
-            <div style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;text-align:center;overflow:hidden;">
+            <div style="
+                width:50mm;
+                height:30mm;
+                display:flex;
+                flex-direction:column;
+                align-items:center;
+                justify-content:flex-start;
+                overflow:hidden;
+                text-align:center;
+            ">
                 <img src="${qrUrl}" style="width:18mm;height:18mm;margin-top:1mm;">
-                <div style="font-size:5.5pt;font-weight:700;line-height:1.15;white-space:pre-line;margin-top:0.5mm;">
-                    ${fullText}
-                </div>
+                <div style="
+                    width:46mm;
+                    font-size:5.2pt;
+                    font-weight:700;
+                    line-height:1.15;
+                    white-space:pre-line;
+                    word-break:break-all;
+                    margin-top:0.8mm;
+                    overflow:hidden;
+                ">${mainText}</div>
             </div>
         `;
     }
 
     if (layoutType === "左1右2") {
         return `
-            <div style="display:grid;grid-template-columns:55% 45%;width:100%;height:100%;overflow:hidden;">
-                <div style="display:flex;align-items:center;justify-content:center;border-right:1px dashed #ccc;overflow:hidden;">
-                    <img src="${qrUrl}" style="width:19mm;height:19mm;">
-                </div>
+            <div style="
+                width:50mm;
+                height:30mm;
+                display:grid;
+                grid-template-columns:25mm 22mm;
+                column-gap:2mm;
+                padding:0.5mm 0.5mm;
+                box-sizing:border-box;
+                overflow:hidden;
+            ">
+                ${bigBlock}
 
-                <div style="display:grid;grid-template-rows:1fr 1fr;height:100%;overflow:hidden;">
-                    <div style="display:flex;align-items:center;gap:0.5mm;border-bottom:1px dashed #ccc;overflow:hidden;">
-                        <img src="${qrUrl}" style="width:8.5mm;height:8.5mm;flex-shrink:0;">
-                        <div style="font-size:3.2pt;font-weight:700;line-height:1.05;white-space:pre-line;text-align:left;overflow:hidden;">
-                            ${shortText}
-                        </div>
-                    </div>
-
-                    <div style="display:flex;align-items:center;gap:0.5mm;overflow:hidden;">
-                        <img src="${qrUrl}" style="width:8.5mm;height:8.5mm;flex-shrink:0;">
-                        <div style="font-size:3.2pt;font-weight:700;line-height:1.05;white-space:pre-line;text-align:left;overflow:hidden;">
-                            ${shortText}
-                        </div>
-                    </div>
+                <div style="
+                    width:22mm;
+                    height:28mm;
+                    display:grid;
+                    grid-template-rows:13.5mm 1mm 13.5mm;
+                    overflow:hidden;
+                ">
+                    ${smallBlock}
+                    <div style="border-top:1px dashed #bbb;width:100%;"></div>
+                    ${smallBlock}
                 </div>
             </div>
         `;
     }
 
     if (layoutType === "左1右3") {
-        return `
-            <div style="display:grid;grid-template-columns:50% 50%;width:100%;height:100%;overflow:hidden;">
-                <div style="display:flex;align-items:center;justify-content:center;border-right:1px dashed #ccc;overflow:hidden;">
-                    <img src="${qrUrl}" style="width:17mm;height:17mm;">
-                </div>
+        const tinyBlock = `
+            <div style="
+                width:21mm;
+                height:8.8mm;
+                display:grid;
+                grid-template-columns:6.2mm 14mm;
+                column-gap:0.5mm;
+                align-items:center;
+                overflow:hidden;
+                box-sizing:border-box;
+            ">
+                <img src="${qrUrl}" style="width:6.2mm;height:6.2mm;">
+                <div style="
+                    font-size:2.9pt;
+                    font-weight:700;
+                    line-height:0.95;
+                    white-space:pre-line;
+                    word-break:break-all;
+                    text-align:left;
+                    overflow:hidden;
+                ">${smallText}</div>
+            </div>
+        `;
 
-                <div style="display:grid;grid-template-rows:1fr 1fr 1fr;height:100%;overflow:hidden;">
-                    ${[1,2,3].map((_,i)=>`
-                        <div style="display:flex;align-items:center;gap:0.4mm;${i<2?'border-bottom:1px dashed #ccc;':''}overflow:hidden;">
-                            <img src="${qrUrl}" style="width:6.5mm;height:6.5mm;flex-shrink:0;">
-                            <div style="font-size:2.7pt;font-weight:700;line-height:1;white-space:pre-line;text-align:left;overflow:hidden;">
-                                ${shortText}
-                            </div>
-                        </div>
-                    `).join("")}
+        return `
+            <div style="
+                width:50mm;
+                height:30mm;
+                display:grid;
+                grid-template-columns:25mm 22mm;
+                column-gap:2mm;
+                padding:0.5mm 0.5mm;
+                box-sizing:border-box;
+                overflow:hidden;
+            ">
+                ${bigBlock}
+
+                <div style="
+                    width:22mm;
+                    height:28mm;
+                    display:grid;
+                    grid-template-rows:8.8mm 0.8mm 8.8mm 0.8mm 8.8mm;
+                    overflow:hidden;
+                ">
+                    ${tinyBlock}
+                    <div style="border-top:1px dashed #bbb;width:100%;"></div>
+                    ${tinyBlock}
+                    <div style="border-top:1px dashed #bbb;width:100%;"></div>
+                    ${tinyBlock}
                 </div>
             </div>
         `;
