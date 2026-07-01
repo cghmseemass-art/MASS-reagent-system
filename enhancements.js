@@ -169,6 +169,7 @@ function parseScan(raw){try{const p=JSON.parse(raw);if(p.v===2&&p.type==='reagen
 handleTransactionScan=async function(){const raw=txtReagentBarcode.value.trim();if(!raw)return;const p=parseScan(raw),txMode=document.querySelector('input[name="txMode"]:checked').value;try{if(p.formula){formulaScan.value=raw;openAdvanced();return;}const d=await api('/api/transaction/execute',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...p,txMode,operator:currentUser.account,userRole:currentUser.role})});alert(d.message);fetchStockData();}catch(e){if(e.code==='NEED_MANUAL_QTY'){const value=prompt(e.message,'0');if(value!==null&&Number(value)>=0){try{const d=await api('/api/transaction/execute-manual',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...p,txMode,qty:Number(value),operator:currentUser.account})});alert(d.message);fetchStockData();}catch(x){alert('交易中止：'+x.message);}}}else alert('交易中止：'+e.message);}finally{txtReagentBarcode.value='';}};
 
 function labelCaption(){if(!selectedLabel)return barcodeText.value;const r=selectedLabel,c=orgData.campuses.find(x=>x.ID===r.CampusID)?.Name||r.CampusID,g=orgData.groups.find(x=>x.ID===r.GroupID)?.Name||r.GroupID,l=orgData.locations.find(x=>x.ID===r.LocationID)?.Name||r.LocationID;return `${r.BrandName||''} ${r.CATNO}｜LOT ${r.LOTNO}\n${c}｜${g}｜${l}`;}
+
 buildLabelInnerHTML = function(layoutType, qrUrl) {
     const text = labelCaption();
     const lines = String(text || "")
@@ -180,162 +181,70 @@ buildLabelInnerHTML = function(layoutType, qrUrl) {
     const mainText = esc(lines.slice(0, 4).join("\n"));
     const smallText = esc(lines.slice(0, 4).join("\n"));
 
-    const bigBlock = `
-        <div style="
-            width:24mm;
-            height:28mm;
-            display:flex;
-            flex-direction:column;
-            align-items:center;
-            justify-content:flex-start;
-            overflow:hidden;
-            text-align:center;
-        ">
-            <img src="${qrUrl}" style="width:19mm;height:19mm;margin-top:1mm;">
-            <div style="
-                width:23mm;
-                font-size:4.6pt;
-                font-weight:700;
-                line-height:1.05;
-                white-space:pre-line;
-                word-break:break-all;
-                margin-top:0.6mm;
-                overflow:hidden;
-            ">${mainText}</div>
-        </div>
-    `;
-
-    const smallBlock = `
-        <div style="
-            width:21mm;
-            height:13.5mm;
-            display:grid;
-            grid-template-columns:7.5mm 13mm;
-            column-gap:0.5mm;
-            align-items:center;
-            overflow:hidden;
-            box-sizing:border-box;
-        ">
-            <img src="${qrUrl}" style="width:7.5mm;height:7.5mm;">
-            <div style="
-                font-size:3.4pt;
-                font-weight:700;
-                line-height:1.0;
-                white-space:pre-line;
-                word-break:break-all;
-                text-align:left;
-                overflow:hidden;
-            ">${smallText}</div>
-        </div>
-    `;
-
     if (layoutType === "一大") {
         return `
-            <div style="
-                width:50mm;
-                height:30mm;
-                display:flex;
-                flex-direction:column;
-                align-items:center;
-                justify-content:flex-start;
-                overflow:hidden;
-                text-align:center;
-            ">
-                <img src="${qrUrl}" style="width:18mm;height:18mm;margin-top:1mm;">
-                <div style="
-                    width:46mm;
-                    font-size:5.2pt;
-                    font-weight:700;
-                    line-height:1.15;
-                    white-space:pre-line;
-                    word-break:break-all;
-                    margin-top:0.8mm;
-                    overflow:hidden;
-                ">${mainText}</div>
+            <div style="grid-column:1/-1;position:relative;width:50mm;height:30mm;overflow:hidden;text-align:center;">
+                <img src="${qrUrl}" style="position:absolute;left:16mm;top:1.5mm;width:18mm;height:18mm;">
+                <div style="position:absolute;left:2mm;top:20.5mm;width:46mm;font-size:5.2pt;font-weight:700;line-height:1.15;white-space:pre-line;word-break:break-all;">
+                    ${mainText}
+                </div>
             </div>
         `;
     }
 
     if (layoutType === "左1右2") {
         return `
-            <div style="
-                width:50mm;
-                height:30mm;
-                display:grid;
-                grid-template-columns:25mm 22mm;
-                column-gap:2mm;
-                padding:0.5mm 0.5mm;
-                box-sizing:border-box;
-                overflow:hidden;
-            ">
-                ${bigBlock}
+            <div style="grid-column:1/-1;position:relative;width:50mm;height:30mm;overflow:hidden;">
+                <!-- 左側大標籤 -->
+                <img src="${qrUrl}" style="position:absolute;left:1mm;top:2mm;width:18mm;height:18mm;">
+                <div style="position:absolute;left:1mm;top:20.5mm;width:23mm;text-align:center;font-size:4.4pt;font-weight:700;line-height:1.08;white-space:pre-line;word-break:break-all;">
+                    ${mainText}
+                </div>
 
-                <div style="
-                    width:22mm;
-                    height:28mm;
-                    display:grid;
-                    grid-template-rows:13.5mm 1mm 13.5mm;
-                    overflow:hidden;
-                ">
-                    ${smallBlock}
-                    <div style="border-top:1px dashed #bbb;width:100%;"></div>
-                    ${smallBlock}
+                <!-- 中間分隔線 -->
+                <div style="position:absolute;left:25mm;top:1mm;height:28mm;border-left:1px dashed #bbb;"></div>
+
+                <!-- 右上小標籤 -->
+                <img src="${qrUrl}" style="position:absolute;left:27mm;top:2mm;width:8mm;height:8mm;">
+                <div style="position:absolute;left:35.5mm;top:1.8mm;width:13.5mm;font-size:3.3pt;font-weight:700;line-height:1.05;white-space:pre-line;word-break:break-all;">
+                    ${smallText}
+                </div>
+
+                <div style="position:absolute;left:27mm;top:14.8mm;width:21.5mm;border-top:1px dashed #bbb;"></div>
+
+                <!-- 右下小標籤 -->
+                <img src="${qrUrl}" style="position:absolute;left:27mm;top:16.5mm;width:8mm;height:8mm;">
+                <div style="position:absolute;left:35.5mm;top:16.2mm;width:13.5mm;font-size:3.3pt;font-weight:700;line-height:1.05;white-space:pre-line;word-break:break-all;">
+                    ${smallText}
                 </div>
             </div>
         `;
     }
 
     if (layoutType === "左1右3") {
-        const tinyBlock = `
-            <div style="
-                width:21mm;
-                height:8.8mm;
-                display:grid;
-                grid-template-columns:6.2mm 14mm;
-                column-gap:0.5mm;
-                align-items:center;
-                overflow:hidden;
-                box-sizing:border-box;
-            ">
-                <img src="${qrUrl}" style="width:6.2mm;height:6.2mm;">
-                <div style="
-                    font-size:2.9pt;
-                    font-weight:700;
-                    line-height:0.95;
-                    white-space:pre-line;
-                    word-break:break-all;
-                    text-align:left;
-                    overflow:hidden;
-                ">${smallText}</div>
-            </div>
-        `;
-
         return `
-            <div style="
-                width:50mm;
-                height:30mm;
-                display:grid;
-                grid-template-columns:25mm 22mm;
-                column-gap:2mm;
-                padding:0.5mm 0.5mm;
-                box-sizing:border-box;
-                overflow:hidden;
-            ">
-                ${bigBlock}
-
-                <div style="
-                    width:22mm;
-                    height:28mm;
-                    display:grid;
-                    grid-template-rows:8.8mm 0.8mm 8.8mm 0.8mm 8.8mm;
-                    overflow:hidden;
-                ">
-                    ${tinyBlock}
-                    <div style="border-top:1px dashed #bbb;width:100%;"></div>
-                    ${tinyBlock}
-                    <div style="border-top:1px dashed #bbb;width:100%;"></div>
-                    ${tinyBlock}
+            <div style="grid-column:1/-1;position:relative;width:50mm;height:30mm;overflow:hidden;">
+                <!-- 左側大標籤 -->
+                <img src="${qrUrl}" style="position:absolute;left:1mm;top:2mm;width:17mm;height:17mm;">
+                <div style="position:absolute;left:1mm;top:20mm;width:23mm;text-align:center;font-size:4.1pt;font-weight:700;line-height:1.05;white-space:pre-line;word-break:break-all;">
+                    ${mainText}
                 </div>
+
+                <!-- 中間分隔線 -->
+                <div style="position:absolute;left:25mm;top:1mm;height:28mm;border-left:1px dashed #bbb;"></div>
+
+                <!-- 右側三小標籤 -->
+                ${[0, 1, 2].map(i => {
+                    const top = 1.5 + i * 9.2;
+                    const lineTop = top + 8.7;
+                    return `
+                        <img src="${qrUrl}" style="position:absolute;left:27mm;top:${top}mm;width:6.8mm;height:6.8mm;">
+                        <div style="position:absolute;left:34.2mm;top:${top - 0.2}mm;width:14.5mm;font-size:2.85pt;font-weight:700;line-height:0.98;white-space:pre-line;word-break:break-all;">
+                            ${smallText}
+                        </div>
+                        ${i < 2 ? `<div style="position:absolute;left:27mm;top:${lineTop}mm;width:21.5mm;border-top:1px dashed #bbb;"></div>` : ""}
+                    `;
+                }).join("")}
             </div>
         `;
     }
