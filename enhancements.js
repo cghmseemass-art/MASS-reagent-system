@@ -1,3 +1,4 @@
+/*MASS-reagent-system-main/enhancements.js*/
 /* Multi-campus, location, unit conversion and formula extension. */
 let orgData = { campuses: [], groups: [], locations: [] };
 let selectedLabel = null;
@@ -67,8 +68,73 @@ fetchStockData=async function(){try{const data=await api(scoped('/api/stock'));r
 
 loadQRReagentNames=async function(keyword){const names=await api(scoped('/api/qr/reagent-names?keyword='+encodeURIComponent(keyword)));lstReagentName.innerHTML='';lstCATNO.innerHTML='';lstLOTNO.innerHTML='';names.forEach(n=>lstReagentName.add(new Option(n.ReagentName,n.ReagentName)));};
 loadQRCATNO=async function(name){const a=await api(scoped('/api/qr/catno?reagentName='+encodeURIComponent(name)));lstCATNO.innerHTML='';lstLOTNO.innerHTML='';a.forEach(x=>lstCATNO.add(new Option(x.CATNO,x.CATNO)));};
-loadQRLOTNO=async function(name,cat){const a=await api(scoped('/api/qr/lotno?reagentName='+encodeURIComponent(name)+'&catNo='+encodeURIComponent(cat)));lstLOTNO.innerHTML='';a.forEach(x=>{const o=new Option(`${x.LOTNO}｜位置 ${x.LocationID}`,x.LOTNO);Object.assign(o.dataset,x);lstLOTNO.add(o);});};
-putBarcodeToPrintLabel=async function(){const o=lstLOTNO.selectedOptions[0];if(!o)return alert('請選擇批號與位置');const r=(await api('/api/reagents/search')).find(x=>String(x.ID)===String(o.dataset.reagentid));if(!r)return alert('找不到試劑');const payload={v:2,type:'reagent',id:r.ID,cat:r.CATNO,lot:r.LOTNO,campus:r.CampusID,group:r.GroupID,location:r.LocationID};barcodeText.value=JSON.stringify(payload);selectedLabel=r;closeModal('SelectQR');generateLabelPreview();};
+loadQRLOTNO = async function(name, cat) {
+    const a = await api(scoped('/api/qr/lotno?reagentName=' + encodeURIComponent(name) + '&catNo=' + encodeURIComponent(cat)));
+
+    lstLOTNO.innerHTML = "";
+
+    a.forEach(x => {
+        const o = new Option(`${x.LOTNO}｜位置 ${x.LocationID}`, x.LOTNO);
+
+        // 重要：不要用 Object.assign(o.dataset, x)
+        // 改成自己明確存欄位，避免大小寫變形
+        o.dataset.reagentId = x.ReagentID || x.ID || "";
+        o.dataset.lotNo = x.LOTNO || "";
+        o.dataset.locationId = x.LocationID || "";
+
+        lstLOTNO.add(o);
+    });
+};
+putBarcodeToPrintLabel = async function() {
+    const o = lstLOTNO.selectedOptions[0];
+
+    if (!o) {
+        return alert("請選擇批號與位置");
+    }
+
+    const reagentID = o.dataset.reagentId;
+    const lotNo = o.dataset.lotNo || o.value;
+
+    let r = null;
+
+    const list = await api(scoped('/api/reagents/search'));
+
+    if (reagentID) {
+        r = list.find(x => String(x.ID) === String(reagentID));
+    }
+
+    // 若後端 QR lotno 沒有回 ReagentID，改用名稱 + CATNO + LOTNO 找
+    if (!r) {
+        r = list.find(x =>
+            String(x.ReagentName) === String(lstReagentName.value) &&
+            String(x.CATNO) === String(lstCATNO.value) &&
+            String(x.LOTNO) === String(lotNo)
+        );
+    }
+
+    if (!r) {
+        return alert("找不到試劑");
+    }
+
+    const payload = {
+        v: 2,
+        type: "reagent",
+        id: r.ID,
+        cat: r.CATNO,
+        lot: r.LOTNO,
+        campus: r.CampusID,
+        group: r.GroupID,
+        location: r.LocationID
+    };
+
+    barcodeText.value = JSON.stringify(payload);
+
+    // 這個會讓 QR 下方顯示試劑資訊
+    selectedLabel = r;
+
+    closeModal("SelectQR");
+    generateLabelPreview();
+};
 
 function parseScan(raw){try{const p=JSON.parse(raw);if(p.v===2&&p.type==='reagent')return{reagentId:p.id,campusID:p.campus,groupID:p.group,locationID:p.location,catNo:p.cat,lotNo:p.lot};if(p.type==='formula')return{formula:p};}catch{}const [catNo,lotNo]=raw.split('|').map(x=>x.trim());return{catNo,lotNo,campusID:currentUser.campusID,groupID:currentUser.groupID};}
 handleTransactionScan=async function(){const raw=txtReagentBarcode.value.trim();if(!raw)return;const p=parseScan(raw),txMode=document.querySelector('input[name="txMode"]:checked').value;try{if(p.formula){formulaScan.value=raw;openAdvanced();return;}const d=await api('/api/transaction/execute',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...p,txMode,operator:currentUser.account,userRole:currentUser.role})});alert(d.message);fetchStockData();}catch(e){if(e.code==='NEED_MANUAL_QTY'){const value=prompt(e.message,'0');if(value!==null&&Number(value)>=0){try{const d=await api('/api/transaction/execute-manual',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...p,txMode,qty:Number(value),operator:currentUser.account})});alert(d.message);fetchStockData();}catch(x){alert('交易中止：'+x.message);}}}else alert('交易中止：'+e.message);}finally{txtReagentBarcode.value='';}};
