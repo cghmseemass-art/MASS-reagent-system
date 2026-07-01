@@ -1,4 +1,4 @@
-// ==app.js===============================================
+// ==MASS-reagent-system-main/app.js===============================================
 // ====================================================================
 // 1. 全域系統狀態配置管理庫
 // ====================================================================
@@ -15,6 +15,10 @@ const AUTO_LOGOUT_MIN = 20;
 let rgCurrentEditMode = "UPDATE";
 let usrCurrentEditMode = "UPDATE";
 let selectedReagentList = [];
+let currentPrintLabelMeta = {
+    title: "",
+    subtitle: ""
+};
 
 // 手機相機全域變數
 let html5QrScanner = null;
@@ -321,9 +325,15 @@ function putBarcodeToPrintLabel() {
         return;
     }
 
-    const barcodeText = `${catNo}|${lotNo}`;
-    document.getElementById("barcodeText").value = barcodeText;
-    closeModal("SelectQR");
+	const barcodeText = `${catNo}|${lotNo}`;
+	document.getElementById("barcodeText").value = barcodeText;
+
+	currentPrintLabelMeta = {
+		title: rName,
+		subtitle: `CATNO: ${catNo}  LOTNO: ${lotNo}`
+	};
+
+	closeModal("SelectQR");
 
     if (confirm(`已成功擷取該品項規格資原始碼：\n${barcodeText}\n\n是否立即執行條碼機畫布出圖與精密排版？`)) {
         generateLabelPreview();
@@ -1254,29 +1264,55 @@ function triggerLabelPrint() {
     window.print();
 }
 
+function buildLabelCaptionHTML() {
+    const title = currentPrintLabelMeta.title || "";
+    const subtitle = currentPrintLabelMeta.subtitle || "";
+
+    if (!title && !subtitle) return "";
+
+    return `
+        <div style="
+            width: 100%;
+            text-align: center;
+            font-size: 6px;
+            line-height: 1.1;
+            font-weight: 700;
+            margin-top: 0.5mm;
+            word-break: break-all;
+        ">
+            <div>${title}</div>
+            <div style="font-size:5px;font-weight:500;">${subtitle}</div>
+        </div>
+    `;
+}
+
 function buildLabelInnerHTML(layoutType, qrUrl) {
 
     if (layoutType === "一大") {
         return `
-            <div class="flex items-start justify-center h-full w-full">
-                <img src="${qrUrl}" style="width:90%;height:auto;" />
+            <div class="flex flex-col items-center justify-start h-full w-full">
+                <img src="${qrUrl}" style="width:68%;height:auto;" />
+                ${buildLabelCaptionHTML()}
             </div>
         `;
     }
 
     if (layoutType === "左1右2") {
         return `
-            <div class="col-left flex items-start justify-center border-r border-dashed border-slate-300">
-                <img src="${qrUrl}" style="width:90%;height:auto;" />
+            <div class="col-left flex flex-col items-center justify-start border-r border-dashed border-slate-300">
+                <img src="${qrUrl}" style="width:65%;height:auto;" />
+                ${buildLabelCaptionHTML()}
             </div>
 
             <div class="col-right h-full">
-                <div class="flex items-start justify-center border-b border-dashed border-slate-300">
+                <div class="flex flex-col items-center justify-start border-b border-dashed border-slate-300">
                     <img src="${qrUrl}" style="width:35%;height:auto;" />
+                    ${buildLabelCaptionHTML()}
                 </div>
 
-                <div class="flex items-start justify-center">
+                <div class="flex flex-col items-center justify-start">
                     <img src="${qrUrl}" style="width:35%;height:auto;" />
+                    ${buildLabelCaptionHTML()}
                 </div>
             </div>
         `;
@@ -1284,21 +1320,25 @@ function buildLabelInnerHTML(layoutType, qrUrl) {
 
     if (layoutType === "左1右3") {
         return `
-            <div class="col-left flex items-start justify-center border-r border-dashed border-slate-300">
-                <img src="${qrUrl}" style="width:90%;height:auto;" />
+            <div class="col-left flex flex-col items-center justify-start border-r border-dashed border-slate-300">
+                <img src="${qrUrl}" style="width:65%;height:auto;" />
+                ${buildLabelCaptionHTML()}
             </div>
 
             <div class="col-right h-full">
-                <div class="flex items-start justify-center border-b border-dashed border-slate-300">
-                    <img src="${qrUrl}" style="width:25%;height:auto;" />
+                <div class="flex flex-col items-center justify-start border-b border-dashed border-slate-300">
+                    <img src="${qrUrl}" style="width:30%;height:auto;" />
+                    ${buildLabelCaptionHTML()}
                 </div>
 
-                <div class="flex items-start justify-center border-b border-dashed border-slate-300">
-                    <img src="${qrUrl}" style="width:25%;height:auto;" />
+                <div class="flex flex-col items-center justify-start border-b border-dashed border-slate-300">
+                    <img src="${qrUrl}" style="width:30%;height:auto;" />
+                    ${buildLabelCaptionHTML()}
                 </div>
 
-                <div class="flex items-start justify-center">
-                    <img src="${qrUrl}" style="width:25%;height:auto;" />
+                <div class="flex flex-col items-center justify-start">
+                    <img src="${qrUrl}" style="width:30%;height:auto;" />
+                    ${buildLabelCaptionHTML()}
                 </div>
             </div>
         `;
