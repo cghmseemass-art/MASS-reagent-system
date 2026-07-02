@@ -316,12 +316,6 @@ putBarcodeToPrintLabel = async function() {
 
 
 
-    barcodeText.value = JSON.stringify(payload);
-    selectedLabel = r;
-
-    closeModal("SelectQR");
-    generateLabelPreview();
-};
 
 function parseScan(raw){try{const p=JSON.parse(raw);if(p.v===2&&p.type==='reagent')return{reagentId:p.id,campusID:p.campus,groupID:p.group,locationID:p.location,catNo:p.cat,lotNo:p.lot};if(p.type==='formula')return{formula:p};}catch{}const [catNo,lotNo]=raw.split('|').map(x=>x.trim());return{catNo,lotNo,campusID:currentUser.campusID,groupID:currentUser.groupID};}
 handleTransactionScan=async function(){const raw=txtReagentBarcode.value.trim();if(!raw)return;const p=parseScan(raw),txMode=document.querySelector('input[name="txMode"]:checked').value;try{if(p.formula){formulaScan.value=raw;openAdvanced();return;}const d=await api('/api/transaction/execute',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...p,txMode,operator:currentUser.account,userRole:currentUser.role})});alert(d.message);fetchStockData();}catch(e){if(e.code==='NEED_MANUAL_QTY'){const value=prompt(e.message,'0');if(value!==null&&Number(value)>=0){try{const d=await api('/api/transaction/execute-manual',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...p,txMode,qty:Number(value),operator:currentUser.account})});alert(d.message);fetchStockData();}catch(x){alert('交易中止：'+x.message);}}}else alert('交易中止：'+e.message);}finally{txtReagentBarcode.value='';}};
@@ -355,8 +349,8 @@ buildLabelInnerHTML = function(layoutType, qrUrl) {
     if (layoutType === "一大") {
         return `
             <div style="grid-column:1/-1;position:relative;width:50mm;height:30mm;overflow:hidden;text-align:center;">
-                <img src="${qrUrl}" style="position:absolute;left:16mm;top:1.5mm;width:18mm;height:18mm;">
-                <div style="position:absolute;left:2mm;top:20.5mm;width:46mm;font-size:5.2pt;font-weight:700;line-height:1.15;white-space:pre-line;word-break:break-all;">
+                <img src="${qrUrl}" style="position:absolute;left:17mm;top:1.2mm;width:16mm;height:16mm;">
+                <div style="position:absolute;left:2mm;top:18.2mm;width:46mm;font-size:5.2pt;font-weight:700;line-height:1.15;white-space:pre-line;word-break:break-all;">
                     ${mainText}
                 </div>
             </div>
