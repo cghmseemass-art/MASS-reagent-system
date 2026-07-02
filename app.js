@@ -594,10 +594,11 @@ function loadSelectedRg(index) {
     document.getElementById("rg_CurrentStock").value = item.CurrentStock || 0;
     document.getElementById("rg_AlertQty").value = item.AlertQty || 0;
 
-    const unitObj = document.getElementById("rg_Unit");
-    if (unitObj) {
-        unitObj.value = item.Unit || item.BaseUnit || "ml";
-    }
+	const unitObj = document.getElementById("rg_Unit");
+	if (unitObj) {
+	    const u = String(item.Unit || item.BaseUnit || "ml").toLowerCase();
+	    unitObj.value = u;
+	}
 
     // 效期帶回
     const expObj = document.getElementById("rg_ExpDate");
