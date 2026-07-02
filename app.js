@@ -596,8 +596,33 @@ function loadSelectedRg(index) {
 
     const unitObj = document.getElementById("rg_Unit");
     if (unitObj) {
-        unitObj.value = item.Unit || "ml";
+        unitObj.value = item.Unit || item.BaseUnit || "ml";
     }
+
+    // 效期帶回
+    const expObj = document.getElementById("rg_ExpDate");
+    if (expObj) {
+        expObj.value = item.ExpDate || "";
+    }
+
+    // 院區 / 組別 / 位置帶回
+    const campusObj = document.getElementById("rg_CampusID");
+    const groupObj = document.getElementById("rg_GroupID");
+    const locationObj = document.getElementById("rg_LocationID");
+
+    if (campusObj) campusObj.value = item.CampusID || "C001";
+
+    if (typeof refreshBusinessOrgSelects === "function") {
+        refreshBusinessOrgSelects();
+    }
+
+    if (groupObj) groupObj.value = item.GroupID || "G001";
+
+    if (typeof refreshBusinessOrgSelects === "function") {
+        refreshBusinessOrgSelects();
+    }
+
+    if (locationObj) locationObj.value = item.LocationID || "L001";
 
     const chk = document.getElementById("rg_IsActive");
     if (chk) {
@@ -630,6 +655,7 @@ async function saveReagentMaster() {
             currentStock: parseFloat(document.getElementById("rg_CurrentStock").value) || 0,
             alertQty: parseFloat(document.getElementById("rg_AlertQty").value) || 0,
             unit: document.getElementById("rg_Unit").value,
+			baseUnit: document.getElementById("rg_Unit").value,
             campusID: document.getElementById("rg_CampusID")?.value || "C001",
             groupID: document.getElementById("rg_GroupID")?.value || "G001",
             locationID: document.getElementById("rg_LocationID")?.value || "L001",
