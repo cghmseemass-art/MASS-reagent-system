@@ -27,7 +27,18 @@ function advancedModal(){return `<div id="modal_Advanced" class="fixed inset-0 b
  </div>
  <section class="border rounded p-4 space-y-3"><div class="flex flex-wrap justify-between gap-2"><h3 class="font-bold text-lg">複方配製標準檔（最多 20 種）</h3><div><button onclick="exportFormula()" class="bg-emerald-600 text-white px-3 py-2 rounded">匯出 CSV</button><label class="bg-indigo-600 text-white px-3 py-2 rounded cursor-pointer">匯入 CSV<input type="file" accept=".csv" hidden onchange="importFormula(this)"></label></div></div>
   <div class="grid md:grid-cols-4 gap-2"><input id="formulaID" type="hidden"><input id="formulaName" class="border p-2" placeholder="配方名稱"><input id="yieldQty" class="border p-2" type="number" value="1" placeholder="產出量"><input id="yieldUnit" class="border p-2" placeholder="產出單位"><button onclick="addComponent()" class="bg-slate-700 text-white rounded">＋成分</button></div>
-  <div id="componentRows" class="space-y-2"></div><div class="flex gap-2"><button onclick="saveFormula()" class="bg-blue-600 text-white px-4 py-2 rounded">儲存配方</button><button onclick="clearFormula()" class="bg-slate-200 px-4 py-2 rounded">清空</button></div>
+  <div id="componentRows" class="space-y-2"></div>
+  
+  <div class="flex flex-wrap gap-2 items-center">
+      <button onclick="saveFormula()" class="bg-blue-600 text-white px-4 py-2 rounded">儲存配方</button>
+      <button onclick="clearFormula()" class="bg-slate-200 px-4 py-2 rounded">清空</button>
+  
+      <label class="ml-auto text-sm font-bold text-slate-600 flex items-center gap-2">
+          <input type="checkbox" id="showInactiveFormula" onchange="loadFormulas()">
+          顯示停用複方
+      </label>
+  </div>
+  
   <div id="formulaList" class="overflow-auto"></div>
  </section>
  <section class="border rounded p-4"><h3 class="font-bold">刷複方 QR 一次扣除所有成分</h3><div class="flex gap-2 mt-2"><input id="formulaScan" class="border p-2 flex-1 font-mono" placeholder='掃描 {"v":2,"type":"formula","id":"F001"}' onkeydown="if(event.key==='Enter')executeFormulaQR()"><input id="formulaMultiplier" type="number" min="0.001" step="0.001" value="1" class="border p-2 w-28"><button onclick="executeFormulaQR()" class="bg-rose-600 text-white px-4 rounded">配製並扣庫</button></div></section>
@@ -224,7 +235,9 @@ async function saveFormula() {
     loadFormulas();
 }
 async function loadFormulas() {
-    const list = await api('/api/formulas');
+    const showInactive = document.getElementById("showInactiveFormula")?.checked === true;
+    const list = await api('/api/formulas' + (showInactive ? '?includeInactive=1' : ''));
+
     window.formulas = list;
 
     const canMaintainFormula =
@@ -234,6 +247,7 @@ async function loadFormulas() {
         <table class="w-full text-sm">
             <thead>
                 <tr class="bg-slate-700 text-white">
+                    <th class="p-2">狀態</th>
                     <th class="p-2">配方</th>
                     <th>成分數</th>
                     <th>QR 內容</th>
@@ -241,37 +255,47 @@ async function loadFormulas() {
                 </tr>
             </thead>
             <tbody>
-                ${list.map(f => `
-                    <tr class="border-b hover:bg-slate-50">
-                        <td class="p-2 font-bold">
-                            ${esc(f.ID)} ${esc(f.Name)}
-                        </td>
-                        <td class="text-center">
-                            ${f.Components?.length || 0}
-                        </td>
-                        <td class="font-mono text-xs break-all">
-                            ${esc(JSON.stringify({v:2,type:'formula',id:f.ID}))}
-                        </td>
-                        <td class="p-2 text-center whitespace-nowrap">
-                            <button class="text-blue-700 font-bold"
-                                    onclick="editFormula('${f.ID}')">
-                                編輯
-                            </button>
-                            ｜
-                            <button class="text-emerald-700 font-bold"
-                                    onclick="formulaScan.value='${esc(JSON.stringify({v:2,type:'formula',id:f.ID}))}';executeFormulaQR()">
-                                配製
-                            </button>
-                            ${canMaintainFormula ? `
-                                ｜
-                                <button class="text-rose-700 font-bold"
-                                        onclick="deleteFormula('${f.ID}')">
-                                    停用
+                ${list.map(f => {
+                    const isActive = f.IsActive !== false;
+                    return `
+                        <tr class="border-b hover:bg-slate-50 ${isActive ? "" : "bg-slate-100 text-slate-400"}">
+                            <td class="p-2 text-center font-bold">
+                                ${isActive ? "🟢 啟用" : "🔴 停用"}
+                            </td>
+                            <td class="p-2 font-bold">
+                                ${esc(f.ID)} ${esc(f.Name)}
+                            </td>
+                            <td class="text-center">
+                                ${f.Components?.length || 0}
+                            </td>
+                            <td class="font-mono text-xs break-all">
+                                ${esc(JSON.stringify({v:2,type:'formula',id:f.ID}))}
+                            </td>
+                            <td class="p-2 text-center whitespace-nowrap">
+                                <button class="text-blue-700 font-bold"
+                                        onclick="editFormula('${f.ID}')">
+                                    編輯
                                 </button>
-                            ` : ""}
-                        </td>
-                    </tr>
-                `).join('')}
+                                ｜
+                                ${isActive ? `
+                                    <button class="text-emerald-700 font-bold"
+                                            onclick="formulaScan.value='${esc(JSON.stringify({v:2,type:'formula',id:f.ID}))}';executeFormulaQR()">
+                                        配製
+                                    </button>
+                                ` : `
+                                    <span class="text-slate-400">不可配製</span>
+                                `}
+                                ${canMaintainFormula ? `
+                                    ｜
+                                    <button class="${isActive ? "text-rose-700" : "text-green-700"} font-bold"
+                                            onclick="setFormulaActive('${f.ID}', ${!isActive})">
+                                        ${isActive ? "停用" : "啟用"}
+                                    </button>
+                                ` : ""}
+                            </td>
+                        </tr>
+                    `;
+                }).join('')}
             </tbody>
         </table>
     `;
@@ -305,6 +329,35 @@ async function deleteFormula(id) {
     clearFormula();
     loadFormulas();
 }
+
+async function setFormulaActive(id, isActive) {
+    if (!(currentUser.role === "Admin" || currentUser.role === "Maintainer")) {
+        alert("權限不足：只有 Admin 或 Maintainer 可以變更複方狀態。");
+        return;
+    }
+
+    const actionText = isActive ? "啟用" : "停用";
+
+    if (!confirm(`確定要${actionText}此複方？\n\n${id}`)) {
+        return;
+    }
+
+    const d = await api('/api/formulas/status', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            id,
+            isActive,
+            reqRole: currentUser.role,
+            reqUser: currentUser.account
+        })
+    });
+
+    alert(d.message || `複方已${actionText}`);
+    clearFormula();
+    loadFormulas();
+}
+
 async function executeFormulaQR(){try{let p=JSON.parse(formulaScan.value);if(p.type!=='formula')throw new Error('不是複方 QR');const d=await api('/api/formulas/execute',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({formulaID:p.id,multiplier:Number(formulaMultiplier.value),operator:currentUser.account})});alert(d.message);formulaScan.value='';fetchStockData();loadFormulas();}catch(e){alert(e.message);}}
 function exportFormula(){location.href=API_BASE+'/api/formulas/export';}async function importFormula(input){const csvData=await input.files[0].text();const d=await api('/api/formulas/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({csvData})});alert(d.message);loadFormulas();input.value='';}
 
