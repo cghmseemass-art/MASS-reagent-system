@@ -445,22 +445,51 @@ function exportFormula(){location.href=API_BASE+'/api/formulas/export';}async fu
 
 const originalLogin=handleLoginScan;handleLoginScan=async function(){await originalLogin();if(currentUser.account){const u=(await api('/api/users/search?keyword='+encodeURIComponent(currentUser.account))).find(x=>x.UserID===currentUser.account);currentUser.campusID=u?.CampusID||'';currentUser.groupID=u?.GroupID||'';fetchStockData();applyRoleSecurity();}};
 const originalApply=applyRoleSecurity;applyRoleSecurity=function(){originalApply();const c=orgData.campuses.find(x=>x.ID===currentUser.campusID)?.Name||currentUser.campusID||'全部院區',g=orgData.groups.find(x=>x.ID===currentUser.groupID)?.Name||currentUser.groupID||'全部組別';userInfo.innerText+=`｜${c}／${g}`;};
-const originalLoadRg=loadSelectedRg;
-loadSelectedRg=function(index){
+const originalLoadRg = loadSelectedRg;
+
+loadSelectedRg = function(index) {
     originalLoadRg(index);
 
-    const x=selectedReagentList[index];
-    if(!x)return;
+    const x = selectedReagentList[index];
+    if (!x) return;
 
-    const exp = document.getElementById('rg_ExpDate');
-    if (exp) exp.value = x.ExpDate || '';
+    setTimeout(() => {
+        const unitObj = document.getElementById("rg_Unit");
+        if (unitObj) {
+            const u = x.Unit || x.BaseUnit || "ml";
 
-    rg_CampusID.value=x.CampusID||'C001';
-    refreshBusinessOrgSelects();
-    rg_GroupID.value=x.GroupID||'G001';
-    refreshBusinessOrgSelects();
-    rg_LocationID.value=x.LocationID||'L001';
+            if (![...unitObj.options].some(o => o.value === u)) {
+                unitObj.add(new Option(u, u));
+            }
+
+            unitObj.value = u;
+        }
+
+        const expObj = document.getElementById("rg_ExpDate");
+        if (expObj) {
+            expObj.value = x.ExpDate || "";
+        }
+
+        const campusObj = document.getElementById("rg_CampusID");
+        const groupObj = document.getElementById("rg_GroupID");
+        const locationObj = document.getElementById("rg_LocationID");
+
+        if (campusObj) campusObj.value = x.CampusID || "C001";
+
+        if (typeof refreshBusinessOrgSelects === "function") {
+            refreshBusinessOrgSelects();
+        }
+
+        if (groupObj) groupObj.value = x.GroupID || "G001";
+
+        if (typeof refreshBusinessOrgSelects === "function") {
+            refreshBusinessOrgSelects();
+        }
+
+        if (locationObj) locationObj.value = x.LocationID || "L001";
+    }, 80);
 };
+
 fetchStockData=async function(){try{const data=await api(scoped('/api/stock'));renderDashboard(data);}catch(e){console.error(e);}};
 
 loadQRReagentNames=async function(keyword){const names=await api(scoped('/api/qr/reagent-names?keyword='+encodeURIComponent(keyword)));lstReagentName.innerHTML='';lstCATNO.innerHTML='';lstLOTNO.innerHTML='';names.forEach(n=>lstReagentName.add(new Option(n.ReagentName,n.ReagentName)));};
@@ -589,33 +618,188 @@ putBarcodeToPrintLabel = async function() {
 
 
 
-function parseScan(raw){try{const p=JSON.parse(raw);if(p.v===2&&p.type==='reagent')return{reagentId:p.id,campusID:p.campus,groupID:p.group,locationID:p.location,catNo:p.cat,lotNo:p.lot};if(p.type==='formula')return{formula:p};}catch{}const [catNo,lotNo]=raw.split('|').map(x=>x.trim());return{catNo,lotNo,campusID:currentUser.campusID,groupID:currentUser.groupID};}
-handleTransactionScan=async function(){const raw=txtReagentBarcode.value.trim();if(!raw)return;const p=parseScan(raw),txMode=document.querySelector('input[name="txMode"]:checked').value;try{
-  if (p.formula) {
-      if (txMode !== "OUT") {
-          alert("複方 QR 僅可用於【出庫】扣庫。\n\n若要入庫或調整庫存，請至複方維護區調整配方，或針對單一試劑操作。");
-          return;
-      }
-  
-      if (!confirm(`確認執行複方出庫？\n\n複方代碼：${p.formula.id}`)) {
-          return;
-      }
-  
-      const d = await api('/api/formulas/execute', {
-          method: 'POST',
-          headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({
-              formulaID: p.formula.id,
-              multiplier: 1,
-              operator: currentUser.account
-          })
-      });
-  
-      alert(d.message);
-      fetchStockData();
-      return;
-  }
-  const d=await api('/api/transaction/execute',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...p,txMode,operator:currentUser.account,userRole:currentUser.role})});alert(d.message);fetchStockData();}catch(e){if(e.code==='NEED_MANUAL_QTY'){const value=prompt(e.message,'0');if(value!==null&&Number(value)>=0){try{const d=await api('/api/transaction/execute-manual',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...p,txMode,qty:Number(value),operator:currentUser.account})});alert(d.message);fetchStockData();}catch(x){alert('交易中止：'+x.message);}}}else alert('交易中止：'+e.message);}finally{txtReagentBarcode.value='';}};
+function parseScan(raw) {
+    raw = String(raw || "").trim();
+
+    try {
+        const p = JSON.parse(raw);
+
+        if (p.v === 2 && p.type === "reagent") {
+            return {
+                type: "reagent",
+                reagentId: p.id,
+                campusID: p.campus,
+                groupID: p.group,
+                locationID: p.location,
+                catNo: p.cat,
+                lotNo: p.lot
+            };
+        }
+
+        if (p.v === 2 && p.type === "formula") {
+            return {
+                type: "formula",
+                formulaID: p.id
+            };
+        }
+    } catch (e) {
+        // 舊版 CATNO|LOTNO 條碼
+    }
+
+    if (raw.includes("|")) {
+        const [catNo, lotNo] = raw.split("|").map(x => x.trim());
+        return {
+            type: "reagent",
+            catNo,
+            lotNo,
+            campusID: currentUser.campusID,
+            groupID: currentUser.groupID
+        };
+    }
+
+    return {
+        type: "unknown",
+        raw
+    };
+}
+
+async function getFormulaPreviewText(formulaID) {
+    const list = await api("/api/formulas?includeInactive=1");
+    const f = list.find(x => String(x.ID) === String(formulaID));
+
+    if (!f) {
+        throw new Error("找不到複方資料：" + formulaID);
+    }
+
+    if (f.IsActive === false) {
+        throw new Error("此複方已停用，不可配製：" + f.Name);
+    }
+
+    const reagents = await api(scoped("/api/reagents/search"));
+
+    const lines = [];
+    lines.push(`複方：${f.Name}`);
+    lines.push(`代碼：${f.ID}`);
+    lines.push("");
+    lines.push("預計扣除：");
+
+    for (const c of f.Components || []) {
+        const r = reagents.find(x => String(x.ID) === String(c.ReagentID));
+        const name = r ? `${r.ReagentName || ""} / ${r.CATNO || ""} / LOT ${r.LOTNO || ""}` : `試劑ID ${c.ReagentID}`;
+        const stock = r ? `，現存 ${r.CurrentStock} ${r.BaseUnit || r.Unit || ""}` : "";
+        lines.push(`- ${name}：${c.Qty} ${c.Unit}${stock}`);
+    }
+
+    return lines.join("\n");
+}
+
+handleTransactionScan = async function() {
+    const input = document.getElementById("txtReagentBarcode");
+    const raw = input.value.trim();
+
+    if (!raw) return;
+
+    if (!currentUser || !currentUser.account) {
+        alert("請先登入後再進行出入庫作業。");
+        input.value = "";
+        openModal("Login");
+        return;
+    }
+
+    const txMode = document.querySelector('input[name="txMode"]:checked').value;
+    const p = parseScan(raw);
+
+    try {
+        // =========================
+        // 複方 QR
+        // =========================
+        if (p.type === "formula") {
+
+            if (txMode !== "OUT") {
+                alert(
+                    "複方 QR 僅可用於【出庫】扣庫。\n\n" +
+                    "【入庫】與【調整】僅限單一試劑。\n" +
+                    "若要調整複方內容，請至【組織／位置／複方】維護區處理。"
+                );
+                return;
+            }
+
+            const preview = await getFormulaPreviewText(p.formulaID);
+
+            if (!confirm(preview + "\n\n確認執行複方出庫扣庫？")) {
+                return;
+            }
+
+            const d = await api("/api/formulas/execute", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({
+                    formulaID: p.formulaID,
+                    multiplier: 1,
+                    operator: currentUser.account
+                })
+            });
+
+            alert(d.message || "複方出庫完成。");
+            fetchStockData();
+            return;
+        }
+
+        // =========================
+        // 單一試劑 QR
+        // =========================
+        if (p.type !== "reagent") {
+            alert("無法辨識條碼格式，請確認是否為本系統產生的試劑或複方 QR。");
+            return;
+        }
+
+        const d = await api("/api/transaction/execute", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({
+                ...p,
+                txMode,
+                operator: currentUser.account,
+                userRole: currentUser.role
+            })
+        });
+
+        alert(d.message);
+        fetchStockData();
+
+    } catch (e) {
+        if (e.code === "NEED_MANUAL_QTY") {
+            const value = prompt(e.message, "0");
+
+            if (value !== null && Number(value) >= 0) {
+                try {
+                    const d = await api("/api/transaction/execute-manual", {
+                        method: "POST",
+                        headers: {"Content-Type": "application/json"},
+                        body: JSON.stringify({
+                            ...p,
+                            txMode,
+                            qty: Number(value),
+                            operator: currentUser.account
+                        })
+                    });
+
+                    alert(d.message);
+                    fetchStockData();
+
+                } catch (x) {
+                    alert("交易中止：" + x.message);
+                }
+            }
+        } else {
+            alert("交易中止：" + e.message);
+        }
+
+    } finally {
+        input.value = "";
+        input.focus();
+    }
+};
 
 function labelCaption() {
     if (!selectedLabel) return barcodeText.value;
