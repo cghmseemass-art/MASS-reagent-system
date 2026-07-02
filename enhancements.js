@@ -33,7 +33,12 @@ function advancedModal(){return `<div id="modal_Advanced" class="fixed inset-0 b
       <button onclick="saveFormula()" class="bg-blue-600 text-white px-4 py-2 rounded">儲存配方</button>
       <button onclick="clearFormula()" class="bg-slate-200 px-4 py-2 rounded">清空</button>
   
-      <label class="ml-auto text-sm font-bold text-slate-600 flex items-center gap-2">
+      <input id="formulaKeyword"
+             class="border p-2 rounded text-sm flex-1 min-w-[180px]"
+             placeholder="搜尋複方名稱或代碼"
+             oninput="loadFormulas()">
+  
+      <label class="text-sm font-bold text-slate-600 flex items-center gap-2">
           <input type="checkbox" id="showInactiveFormula" onchange="loadFormulas()">
           顯示停用複方
       </label>
@@ -176,12 +181,16 @@ async function loadQRFormulas() {
     const list = await api("/api/formulas");
     window.formulas = list;
 
-    if (!Array.isArray(list) || list.length === 0) {
-        sel.add(new Option("目前尚無複方資料", ""));
+    const activeList = Array.isArray(list)
+        ? list.filter(f => f.IsActive !== false)
+        : [];
+
+    if (activeList.length === 0) {
+        sel.add(new Option("目前尚無啟用中的複方資料", ""));
         return;
     }
 
-    list.forEach(f => {
+    activeList.forEach(f => {
         const text = `${f.ID}｜${f.Name}｜成分 ${f.Components?.length || 0} 項`;
         const opt = new Option(text, f.ID);
         opt.dataset.formulaName = f.Name || "";
@@ -234,14 +243,29 @@ async function saveFormula() {
     clearFormula();
     loadFormulas();
 }
+
 async function loadFormulas() {
     const showInactive = document.getElementById("showInactiveFormula")?.checked === true;
-    const list = await api('/api/formulas' + (showInactive ? '?includeInactive=1' : ''));
+    const keyword = document.getElementById("formulaKeyword")?.value?.trim() || "";
 
+    const params = new URLSearchParams();
+    if (keyword) params.set("keyword", keyword);
+    if (showInactive) params.set("includeInactive", "1");
+
+    const list = await api('/api/formulas' + (params.toString() ? '?' + params.toString() : ''));
     window.formulas = list;
 
     const canMaintainFormula =
         currentUser.role === "Admin" || currentUser.role === "Maintainer";
+
+    if (!Array.isArray(list) || list.length === 0) {
+        formulaList.innerHTML = `
+            <div class="p-4 text-center text-slate-500 bg-slate-50 border rounded">
+                查無符合條件的複方資料
+            </div>
+        `;
+        return;
+    }
 
     formulaList.innerHTML = `
         <table class="w-full text-sm">
@@ -249,6 +273,7 @@ async function loadFormulas() {
                 <tr class="bg-slate-700 text-white">
                     <th class="p-2">狀態</th>
                     <th class="p-2">配方</th>
+                    <th>產出</th>
                     <th>成分數</th>
                     <th>QR 內容</th>
                     <th>操作</th>
@@ -257,20 +282,30 @@ async function loadFormulas() {
             <tbody>
                 ${list.map(f => {
                     const isActive = f.IsActive !== false;
+                    const payload = JSON.stringify({v:2,type:'formula',id:f.ID});
+
                     return `
                         <tr class="border-b hover:bg-slate-50 ${isActive ? "" : "bg-slate-100 text-slate-400"}">
                             <td class="p-2 text-center font-bold">
                                 ${isActive ? "🟢 啟用" : "🔴 停用"}
                             </td>
+
                             <td class="p-2 font-bold">
-                                ${esc(f.ID)} ${esc(f.Name)}
+                                <div>${esc(f.ID)} ${esc(f.Name)}</div>
                             </td>
-                            <td class="text-center">
+
+                            <td class="p-2 text-center">
+                                ${esc(f.YieldQty ?? "")} ${esc(f.YieldUnit ?? "")}
+                            </td>
+
+                            <td class="p-2 text-center">
                                 ${f.Components?.length || 0}
                             </td>
-                            <td class="font-mono text-xs break-all">
-                                ${esc(JSON.stringify({v:2,type:'formula',id:f.ID}))}
+
+                            <td class="p-2 font-mono text-xs break-all">
+                                ${esc(payload)}
                             </td>
+
                             <td class="p-2 text-center whitespace-nowrap">
                                 <button class="text-blue-700 font-bold"
                                         onclick="editFormula('${f.ID}')">
@@ -279,7 +314,7 @@ async function loadFormulas() {
                                 ｜
                                 ${isActive ? `
                                     <button class="text-emerald-700 font-bold"
-                                            onclick="formulaScan.value='${esc(JSON.stringify({v:2,type:'formula',id:f.ID}))}';executeFormulaQR()">
+                                            onclick="formulaScan.value='${esc(payload)}';executeFormulaQR()">
                                         配製
                                     </button>
                                 ` : `
@@ -300,6 +335,7 @@ async function loadFormulas() {
         </table>
     `;
 }
+
 async function editFormula(id){const f=window.formulas.find(x=>x.ID===id);formulaID.value=f.ID;formulaName.value=f.Name;yieldQty.value=f.YieldQty;yieldUnit.value=f.YieldUnit;componentRows.innerHTML='';for(const c of f.Components)await addComponent(c);}
 
 async function deleteFormula(id) {
