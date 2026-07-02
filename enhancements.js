@@ -59,7 +59,9 @@ function initQRSelectEnhancement() {
     const modal = document.getElementById("modal_SelectQR");
     if (!modal) return;
 
-    // 手機版修正：外層可捲動
+    // 避免重複插入
+    if (document.getElementById("qrModeTabs")) return;
+
     modal.className =
         "fixed inset-0 bg-slate-900 bg-opacity-60 flex items-start md:items-center justify-center z-40 hidden p-3 overflow-y-auto";
 
@@ -72,22 +74,23 @@ function initQRSelectEnhancement() {
     const title = modal.querySelector("h2");
     if (title) title.innerText = "🔍 選擇 QR Code 條碼來源";
 
-    const reagentGrid = modal.querySelector(".grid.grid-cols-1.md\\:grid-cols-4");
-    if (!reagentGrid) return;
+    // ✅ 不再用 Tailwind selector，改用 lstReagentName 往上找 grid
+    const reagentGrid = document.getElementById("lstReagentName")?.closest(".grid");
+    if (!reagentGrid) {
+        console.error("找不到 QR 試劑選擇區塊");
+        return;
+    }
 
     reagentGrid.id = "qrReagentPickerGrid";
     reagentGrid.className = "grid grid-cols-1 md:grid-cols-4 gap-3 md:gap-4";
 
-    // 手機版 select 高度調整，避免太長
     ["lstReagentName", "lstCATNO", "lstLOTNO"].forEach(id => {
         const el = document.getElementById(id);
         if (el) {
-            el.className = "w-full border rounded-md p-1 h-40 md:h-72 text-sm focus:ring-2 focus:ring-blue-400 outline-none";
+            el.className =
+                "w-full border rounded-md p-1 h-40 md:h-72 text-sm focus:ring-2 focus:ring-blue-400 outline-none";
         }
     });
-
-    const firstSelect = document.getElementById("lstReagentName");
-    if (firstSelect) firstSelect.className = "w-full border rounded-md p-1 h-40 md:h-64 text-sm focus:ring-2 focus:ring-blue-400 outline-none";
 
     reagentGrid.insertAdjacentHTML("beforebegin", `
         <div id="qrModeTabs" class="grid grid-cols-2 gap-2 bg-slate-100 p-2 rounded-lg">
@@ -109,16 +112,14 @@ function initQRSelectEnhancement() {
     reagentGrid.insertAdjacentHTML("afterend", `
         <div id="qrFormulaPickerPanel" class="hidden space-y-3">
             <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-slate-700">
-                請選擇要列印 QR Code 的複方。列印後掃描此 QR，可進行複方配製扣庫存。
+                請選擇要列印 QR Code 的複方。掃描此 QR 後，可進行複方配製扣庫存。
             </div>
 
-            <div class="space-y-2">
-                <label class="block text-xs font-bold text-slate-600 uppercase">複方清單</label>
-                <select id="lstFormulaQR"
-                        size="10"
-                        class="w-full border rounded-md p-2 h-56 text-sm focus:ring-2 focus:ring-blue-400 outline-none">
-                </select>
-            </div>
+            <label class="block text-xs font-bold text-slate-600 uppercase">複方清單</label>
+            <select id="lstFormulaQR"
+                    size="10"
+                    class="w-full border rounded-md p-2 h-56 text-sm focus:ring-2 focus:ring-blue-400 outline-none">
+            </select>
 
             <button onclick="putBarcodeToPrintLabel()"
                     class="w-full bg-blue-600 text-white p-3 rounded-md hover:bg-blue-700 font-bold shadow text-sm transition">
