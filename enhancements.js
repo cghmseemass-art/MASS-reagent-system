@@ -181,9 +181,130 @@ async function loadQRFormulas() {
 function reagentOptions(){return (window.advancedReagents||[]).map(r=>`<option value="${r.ID}" data-unit="${esc(r.BaseUnit||r.Unit)}">${esc(r.ReagentName)}｜${esc(r.CATNO)}｜${esc(r.LOTNO)}｜${esc(r.LocationID)} (${r.CurrentStock} ${esc(r.BaseUnit||r.Unit)})</option>`).join('');}
 async function addComponent(c={}){if(document.querySelectorAll('.component-row').length>=20)return alert('最多 20 種成分');if(!window.advancedReagents)window.advancedReagents=await api('/api/reagents/search');componentRows.insertAdjacentHTML('beforeend',`<div class="component-row grid grid-cols-[1fr_100px_100px_40px] gap-2"><select class="c-r border p-2">${reagentOptions()}</select><input class="c-q border p-2" type="number" min="0" step="0.001" value="${c.Qty||''}" placeholder="量"><input class="c-u border p-2" value="${esc(c.Unit||'')}" placeholder="單位"><button onclick="this.parentElement.remove()" class="text-red-600">✕</button></div>`);const row=componentRows.lastElementChild;if(c.ReagentID)row.querySelector('.c-r').value=c.ReagentID;if(!c.Unit){const o=row.querySelector('.c-r').selectedOptions[0];row.querySelector('.c-u').value=o?.dataset.unit||'';}row.querySelector('.c-r').onchange=e=>row.querySelector('.c-u').value=e.target.selectedOptions[0]?.dataset.unit||'';}
 function clearFormula(){formulaID.value='';formulaName.value='';yieldQty.value=1;yieldUnit.value='';componentRows.innerHTML='';addComponent();}
-async function saveFormula(){const Components=[...document.querySelectorAll('.component-row')].map(r=>({ReagentID:r.querySelector('.c-r').value,Qty:Number(r.querySelector('.c-q').value),Unit:r.querySelector('.c-u').value}));const b={ID:formulaID.value,Name:formulaName.value,YieldQty:Number(yieldQty.value),YieldUnit:yieldUnit.value,Components};await api('/api/formulas/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});clearFormula();loadFormulas();}
-async function loadFormulas(){const list=await api('/api/formulas');window.formulas=list;formulaList.innerHTML=`<table class="w-full text-sm"><thead><tr class="bg-slate-700 text-white"><th class="p-2">配方</th><th>成分數</th><th>QR 內容</th><th>操作</th></tr></thead><tbody>${list.map(f=>`<tr class="border-b"><td class="p-2">${esc(f.ID)} ${esc(f.Name)}</td><td>${f.Components.length}</td><td class="font-mono text-xs">${esc(JSON.stringify({v:2,type:'formula',id:f.ID}))}</td><td><button class="text-blue-700" onclick="editFormula('${f.ID}')">編輯</button>｜<button class="text-rose-700" onclick="formulaScan.value='${esc(JSON.stringify({v:2,type:'formula',id:f.ID}))}';executeFormulaQR()">配製</button></td></tr>`).join('')}</tbody></table>`;}
+async function saveFormula() {
+    if (!(currentUser.role === "Admin" || currentUser.role === "Maintainer")) {
+        alert("權限不足：只有 Admin 或 Maintainer 可以維護複方。");
+        return;
+    }
+
+    const Components = [...document.querySelectorAll('.component-row')].map(r => ({
+        ReagentID: r.querySelector('.c-r').value,
+        Qty: Number(r.querySelector('.c-q').value),
+        Unit: r.querySelector('.c-u').value
+    }));
+
+    if (!formulaName.value.trim()) {
+        alert("請輸入配方名稱。");
+        return;
+    }
+
+    if (Components.length === 0 || Components.some(c => !c.ReagentID || !c.Qty || c.Qty <= 0)) {
+        alert("請確認每一項成分都有選擇試劑，且用量大於 0。");
+        return;
+    }
+
+    const b = {
+        ID: formulaID.value,
+        Name: formulaName.value.trim(),
+        YieldQty: Number(yieldQty.value) || 1,
+        YieldUnit: yieldUnit.value.trim(),
+        Components,
+        reqRole: currentUser.role,
+        reqUser: currentUser.account
+    };
+
+    await api('/api/formulas/save', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(b)
+    });
+
+    alert("複方資料已儲存。");
+    clearFormula();
+    loadFormulas();
+}
+async function loadFormulas() {
+    const list = await api('/api/formulas');
+    window.formulas = list;
+
+    const canMaintainFormula =
+        currentUser.role === "Admin" || currentUser.role === "Maintainer";
+
+    formulaList.innerHTML = `
+        <table class="w-full text-sm">
+            <thead>
+                <tr class="bg-slate-700 text-white">
+                    <th class="p-2">配方</th>
+                    <th>成分數</th>
+                    <th>QR 內容</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${list.map(f => `
+                    <tr class="border-b hover:bg-slate-50">
+                        <td class="p-2 font-bold">
+                            ${esc(f.ID)} ${esc(f.Name)}
+                        </td>
+                        <td class="text-center">
+                            ${f.Components?.length || 0}
+                        </td>
+                        <td class="font-mono text-xs break-all">
+                            ${esc(JSON.stringify({v:2,type:'formula',id:f.ID}))}
+                        </td>
+                        <td class="p-2 text-center whitespace-nowrap">
+                            <button class="text-blue-700 font-bold"
+                                    onclick="editFormula('${f.ID}')">
+                                編輯
+                            </button>
+                            ｜
+                            <button class="text-emerald-700 font-bold"
+                                    onclick="formulaScan.value='${esc(JSON.stringify({v:2,type:'formula',id:f.ID}))}';executeFormulaQR()">
+                                配製
+                            </button>
+                            ${canMaintainFormula ? `
+                                ｜
+                                <button class="text-rose-700 font-bold"
+                                        onclick="deleteFormula('${f.ID}')">
+                                    停用
+                                </button>
+                            ` : ""}
+                        </td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+    `;
+}
 async function editFormula(id){const f=window.formulas.find(x=>x.ID===id);formulaID.value=f.ID;formulaName.value=f.Name;yieldQty.value=f.YieldQty;yieldUnit.value=f.YieldUnit;componentRows.innerHTML='';for(const c of f.Components)await addComponent(c);}
+
+async function deleteFormula(id) {
+    if (!(currentUser.role === "Admin" || currentUser.role === "Maintainer")) {
+        alert("權限不足：只有 Admin 或 Maintainer 可以停用複方。");
+        return;
+    }
+
+    const f = window.formulas?.find(x => String(x.ID) === String(id));
+    const name = f ? f.Name : id;
+
+    if (!confirm(`確定要停用複方？\n\n${id} ${name}\n\n停用後將不再出現在複方清單。`)) {
+        return;
+    }
+
+    const d = await api('/api/formulas/delete', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            id,
+            reqRole: currentUser.role,
+            reqUser: currentUser.account
+        })
+    });
+
+    alert(d.message || "複方已停用");
+    clearFormula();
+    loadFormulas();
+}
 async function executeFormulaQR(){try{let p=JSON.parse(formulaScan.value);if(p.type!=='formula')throw new Error('不是複方 QR');const d=await api('/api/formulas/execute',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({formulaID:p.id,multiplier:Number(formulaMultiplier.value),operator:currentUser.account})});alert(d.message);formulaScan.value='';fetchStockData();loadFormulas();}catch(e){alert(e.message);}}
 function exportFormula(){location.href=API_BASE+'/api/formulas/export';}async function importFormula(input){const csvData=await input.files[0].text();const d=await api('/api/formulas/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({csvData})});alert(d.message);loadFormulas();input.value='';}
 
