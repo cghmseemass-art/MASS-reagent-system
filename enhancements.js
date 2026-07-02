@@ -314,16 +314,7 @@ putBarcodeToPrintLabel = async function() {
     generateLabelPreview();
 };
 
-    const payload = {
-        v: 2,
-        type: "reagent",
-        id: r.ID,
-        cat: r.CATNO,
-        lot: r.LOTNO,
-        campus: r.CampusID,
-        group: r.GroupID,
-        location: r.LocationID
-    };
+
 
     barcodeText.value = JSON.stringify(payload);
     selectedLabel = r;
