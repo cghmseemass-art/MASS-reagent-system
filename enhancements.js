@@ -590,7 +590,32 @@ putBarcodeToPrintLabel = async function() {
 
 
 function parseScan(raw){try{const p=JSON.parse(raw);if(p.v===2&&p.type==='reagent')return{reagentId:p.id,campusID:p.campus,groupID:p.group,locationID:p.location,catNo:p.cat,lotNo:p.lot};if(p.type==='formula')return{formula:p};}catch{}const [catNo,lotNo]=raw.split('|').map(x=>x.trim());return{catNo,lotNo,campusID:currentUser.campusID,groupID:currentUser.groupID};}
-handleTransactionScan=async function(){const raw=txtReagentBarcode.value.trim();if(!raw)return;const p=parseScan(raw),txMode=document.querySelector('input[name="txMode"]:checked').value;try{if(p.formula){formulaScan.value=raw;openAdvanced();return;}const d=await api('/api/transaction/execute',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...p,txMode,operator:currentUser.account,userRole:currentUser.role})});alert(d.message);fetchStockData();}catch(e){if(e.code==='NEED_MANUAL_QTY'){const value=prompt(e.message,'0');if(value!==null&&Number(value)>=0){try{const d=await api('/api/transaction/execute-manual',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...p,txMode,qty:Number(value),operator:currentUser.account})});alert(d.message);fetchStockData();}catch(x){alert('交易中止：'+x.message);}}}else alert('交易中止：'+e.message);}finally{txtReagentBarcode.value='';}};
+handleTransactionScan=async function(){const raw=txtReagentBarcode.value.trim();if(!raw)return;const p=parseScan(raw),txMode=document.querySelector('input[name="txMode"]:checked').value;try{
+  if (p.formula) {
+      if (txMode !== "OUT") {
+          alert("複方 QR 僅可用於【出庫】扣庫。\n\n若要入庫或調整庫存，請至複方維護區調整配方，或針對單一試劑操作。");
+          return;
+      }
+  
+      if (!confirm(`確認執行複方出庫？\n\n複方代碼：${p.formula.id}`)) {
+          return;
+      }
+  
+      const d = await api('/api/formulas/execute', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({
+              formulaID: p.formula.id,
+              multiplier: 1,
+              operator: currentUser.account
+          })
+      });
+  
+      alert(d.message);
+      fetchStockData();
+      return;
+  }
+  const d=await api('/api/transaction/execute',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...p,txMode,operator:currentUser.account,userRole:currentUser.role})});alert(d.message);fetchStockData();}catch(e){if(e.code==='NEED_MANUAL_QTY'){const value=prompt(e.message,'0');if(value!==null&&Number(value)>=0){try{const d=await api('/api/transaction/execute-manual',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...p,txMode,qty:Number(value),operator:currentUser.account})});alert(d.message);fetchStockData();}catch(x){alert('交易中止：'+x.message);}}}else alert('交易中止：'+e.message);}finally{txtReagentBarcode.value='';}};
 
 function labelCaption() {
     if (!selectedLabel) return barcodeText.value;
