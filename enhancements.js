@@ -312,6 +312,11 @@ async function loadFormulas() {
                                     編輯
                                 </button>
                                 ｜
+                                <button class="text-indigo-700 font-bold"
+                                        onclick="copyFormula('${f.ID}')">
+                                    複製
+                                </button>
+                                ｜
                                 ${isActive ? `
                                     <button class="text-emerald-700 font-bold"
                                             onclick="formulaScan.value='${esc(payload)}';executeFormulaQR()">
@@ -337,6 +342,34 @@ async function loadFormulas() {
 }
 
 async function editFormula(id){const f=window.formulas.find(x=>x.ID===id);formulaID.value=f.ID;formulaName.value=f.Name;yieldQty.value=f.YieldQty;yieldUnit.value=f.YieldUnit;componentRows.innerHTML='';for(const c of f.Components)await addComponent(c);}
+
+
+async function copyFormula(id) {
+    if (!(currentUser.role === "Admin" || currentUser.role === "Maintainer")) {
+        alert("權限不足：只有 Admin 或 Maintainer 可以複製複方。");
+        return;
+    }
+
+    const f = window.formulas?.find(x => String(x.ID) === String(id));
+
+    if (!f) {
+        alert("找不到要複製的複方。");
+        return;
+    }
+
+    formulaID.value = "";
+    formulaName.value = `${f.Name} - Copy`;
+    yieldQty.value = f.YieldQty || 1;
+    yieldUnit.value = f.YieldUnit || "";
+
+    componentRows.innerHTML = "";
+
+    for (const c of f.Components || []) {
+        await addComponent(c);
+    }
+
+    alert("已複製到編輯區，請確認名稱後按「儲存配方」。");
+}
 
 async function deleteFormula(id) {
     if (!(currentUser.role === "Admin" || currentUser.role === "Maintainer")) {
