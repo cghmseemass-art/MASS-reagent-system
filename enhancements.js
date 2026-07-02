@@ -567,16 +567,17 @@ putBarcodeToPrintLabel = async function() {
         return alert("找不到試劑");
     }
 
-    const payload = {
-        v: 2,
-        type: "reagent",
-        id: r.ID,
-        cat: r.CATNO,
-        lot: r.LOTNO,
-        campus: r.CampusID,
-        group: r.GroupID,
-        location: r.LocationID
-    };
+  const payload = {
+      v: 2,
+      type: "reagent",
+      id: r.ID,
+      cat: r.CATNO,
+      lot: r.LOTNO,
+      exp: r.ExpDate || "",
+      campus: r.CampusID,
+      group: r.GroupID,
+      location: r.LocationID
+  };
 
     barcodeText.value = JSON.stringify(payload);
     selectedLabel = r;
@@ -603,7 +604,9 @@ function labelCaption() {
     const g = orgData.groups.find(x => x.ID === r.GroupID)?.Name || r.GroupID;
     const l = orgData.locations.find(x => x.ID === r.LocationID)?.Name || r.LocationID;
 
-    return `${r.ReagentName || r.BrandName || ""} ${r.CATNO}｜LOT ${r.LOTNO}\n${c}｜${g}｜${l}`;
+    const exp = r.ExpDate ? `\nEXP ${r.ExpDate}` : "";
+
+    return `${r.ReagentName || r.BrandName || ""} ${r.CATNO}｜LOT ${r.LOTNO}${exp}\n${c}｜${g}｜${l}`;
 }
 
 buildLabelInnerHTML = function(layoutType, qrUrl) {
