@@ -633,6 +633,7 @@ async function saveReagentMaster() {
             campusID: document.getElementById("rg_CampusID")?.value || "C001",
             groupID: document.getElementById("rg_GroupID")?.value || "G001",
             locationID: document.getElementById("rg_LocationID")?.value || "L001",
+			expDate: document.getElementById("rg_ExpDate")?.value || "",
             isActive: currentIsActive, 
             editMode: rgCurrentEditMode
         };
