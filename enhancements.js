@@ -12,7 +12,20 @@ document.addEventListener('DOMContentLoaded', () => {
   document.body.insertAdjacentHTML('beforeend', advancedModal());
   const qrInput=document.getElementById('barcodeText'); qrInput.previousElementSibling.innerText='QR 編碼內容（系統自動產生版本化資料）';
   const unitBlock=document.getElementById('rg_Unit')?.parentElement;
-  unitBlock?.insertAdjacentHTML('afterend', `<div class="grid grid-cols-1 gap-2 border-t pt-2"><label class="font-bold">院區</label><select id="rg_CampusID" class="border p-2 rounded"></select><label class="font-bold">組別</label><select id="rg_GroupID" class="border p-2 rounded"></select><label class="font-bold">擺放位置</label><select id="rg_LocationID" class="border p-2 rounded"></select></div>`);
+  unitBlock?.insertAdjacentHTML('afterend', `
+  <div class="grid grid-cols-1 gap-2 border-t pt-2">
+    <label class="font-bold">效期</label>
+    <input id="rg_ExpDate" type="date" class="border p-2 rounded">
+  
+    <label class="font-bold">院區</label>
+    <select id="rg_CampusID" class="border p-2 rounded"></select>
+  
+    <label class="font-bold">組別</label>
+    <select id="rg_GroupID" class="border p-2 rounded"></select>
+  
+    <label class="font-bold">擺放位置</label>
+    <select id="rg_LocationID" class="border p-2 rounded"></select>
+  </div>`);
   document.getElementById('usr_UserRole')?.parentElement?.insertAdjacentHTML('afterend', `<div><label class="block font-bold text-slate-600">院區</label><select id="usr_CampusID" class="w-full border p-2 rounded"></select></div><div><label class="block font-bold text-slate-600">組別</label><select id="usr_GroupID" class="w-full border p-2 rounded"></select></div>`);
   loadOrg().catch(console.error);
   initQRSelectEnhancement();
@@ -432,7 +445,22 @@ function exportFormula(){location.href=API_BASE+'/api/formulas/export';}async fu
 
 const originalLogin=handleLoginScan;handleLoginScan=async function(){await originalLogin();if(currentUser.account){const u=(await api('/api/users/search?keyword='+encodeURIComponent(currentUser.account))).find(x=>x.UserID===currentUser.account);currentUser.campusID=u?.CampusID||'';currentUser.groupID=u?.GroupID||'';fetchStockData();applyRoleSecurity();}};
 const originalApply=applyRoleSecurity;applyRoleSecurity=function(){originalApply();const c=orgData.campuses.find(x=>x.ID===currentUser.campusID)?.Name||currentUser.campusID||'全部院區',g=orgData.groups.find(x=>x.ID===currentUser.groupID)?.Name||currentUser.groupID||'全部組別';userInfo.innerText+=`｜${c}／${g}`;};
-const originalLoadRg=loadSelectedRg;loadSelectedRg=function(index){originalLoadRg(index);const x=selectedReagentList[index];if(!x)return;rg_CampusID.value=x.CampusID||'C001';refreshBusinessOrgSelects();rg_GroupID.value=x.GroupID||'G001';refreshBusinessOrgSelects();rg_LocationID.value=x.LocationID||'L001';};
+const originalLoadRg=loadSelectedRg;
+loadSelectedRg=function(index){
+    originalLoadRg(index);
+
+    const x=selectedReagentList[index];
+    if(!x)return;
+
+    const exp = document.getElementById('rg_ExpDate');
+    if (exp) exp.value = x.ExpDate || '';
+
+    rg_CampusID.value=x.CampusID||'C001';
+    refreshBusinessOrgSelects();
+    rg_GroupID.value=x.GroupID||'G001';
+    refreshBusinessOrgSelects();
+    rg_LocationID.value=x.LocationID||'L001';
+};
 fetchStockData=async function(){try{const data=await api(scoped('/api/stock'));renderDashboard(data);}catch(e){console.error(e);}};
 
 loadQRReagentNames=async function(keyword){const names=await api(scoped('/api/qr/reagent-names?keyword='+encodeURIComponent(keyword)));lstReagentName.innerHTML='';lstCATNO.innerHTML='';lstLOTNO.innerHTML='';names.forEach(n=>lstReagentName.add(new Option(n.ReagentName,n.ReagentName)));};
